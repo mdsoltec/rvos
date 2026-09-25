@@ -1,0 +1,19 @@
+# ── Dados importados da web por tools/sync-from-web.sh ──
+webroot/covers
+webroot/assets
+webroot/cheats
+webroot/js/catalog.js
+
+# ── EmulatorJS baixado por tools/fetch-emulatorjs.sh ──
+webroot/vendor/emulatorjs/
+
+# ── ROMs locais (nunca versionar!) ──
+roms/
+*.sfc *.smc *.nes *.gba *.gbc *.gb *.n64 *.z64 *.v64 *.bin *.cue *.iso *.chd *.nds *.a26 *.gg *.zip *.7z
+
+# ── build ──
+*.img *.img.xz work-*/
+raspios-lite.img.xz
+
+__pycache__/
+*.pyc

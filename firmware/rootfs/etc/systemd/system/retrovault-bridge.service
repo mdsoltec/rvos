@@ -1,0 +1,14 @@
+[Unit]
+Description=RetroVault OS — bridge (site + API de hardware)
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/retrovault/bridge.py --root /opt/retrovault/public --port 80
+Restart=always
+RestartSec=2
+# device: precisa de root p/ amixer, backlight, nmcli e systemctl poweroff
+
+[Install]
+WantedBy=multi-user.target

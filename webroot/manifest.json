@@ -1,0 +1,30 @@
+{
+  "name": "RetroVault Web - Enter The Classics",
+  "short_name": "RetroVault Web",
+  "description": "Plataforma de emulação de jogos retro e streaming no navegador. 13 consoles, 195+ jogos",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#020503",
+  "theme_color": "#020503",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "assets/rv-icon.png",
+      "sizes": "792x796",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/rv-icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": [
+    "games",
+    "entertainment"
+  ]
+}

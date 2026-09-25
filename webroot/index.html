@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RetroVault OS</title>
+<link rel="stylesheet" href="fonts.css?v=4">
+<link rel="stylesheet" href="shell.css?v=4">
+<link rel="icon" href="assets/rv-icon.png">
+</head>
+<body>
+
+<!-- ══════════════ TELA DE BOOT ══════════════ -->
+<div id="boot">
+  <div class="boot-inner">
+    <img class="boot-logo" src="assets/rv-transparent-final-solid.png" alt="RetroVault" draggable="false">
+    <div class="boot-title">RETROVAULT <span>OS</span></div>
+    <div class="boot-bar"><div class="boot-bar-fill" id="bootFill"></div></div>
+    <div class="boot-msg" id="bootMsg">Iniciando…</div>
+  </div>
+  <div class="boot-footer">RetroVault OS · firmware unificado</div>
+</div>
+
+<!-- ══════════════ APLICAÇÃO ══════════════ -->
+<div id="app" hidden>
+
+  <!-- Barra de status -->
+  <header id="statusbar">
+    <div class="sb-left">
+      <img class="sb-logo" src="assets/rv-transparent-final-solid.png" alt="" draggable="false">
+      <span class="sb-brand">RETROVAULT <b>OS</b></span>
+    </div>
+    <div class="sb-right">
+      <span class="sb-player" id="sbPlayer" hidden></span>
+      <span class="sb-sim" id="sbSim" hidden>SIMULAÇÃO</span>
+      <span class="sb-item" id="sbNet" title="Rede">
+        <svg viewBox="0 0 24 24" class="ic"><path id="sbNetPath" fill="currentColor" d="M12 21l3.5-4.5c-.9-.7-2.1-1.2-3.5-1.2s-2.6.4-3.5 1.2L12 21zm0-18C7.4 3 3.2 4.7 0 7.6l2 2.5C4.6 8 8.1 6.5 12 6.5s7.4 1.5 10 3.6l2-2.5C20.8 4.7 16.6 3 12 3zm0 6c-3 0-5.8 1-8 2.8l2 2.5c1.6-1.2 3.7-2 6-2s4.4.8 6 2l2-2.5C17.8 10 15 9 12 9z"/></svg>
+      </span>
+      <span class="sb-item" id="sbBatt" hidden>
+        <svg viewBox="0 0 24 24" class="ic"><path fill="currentColor" d="M16 4h-2V2h-4v2H8c-.6 0-1 .4-1 1v16c0 .6.4 1 1 1h8c.6 0 1-.4 1-1V5c0-.6-.4-1-1-1z"/><rect id="sbBattFill" x="9.5" y="6" width="5" height="12" fill="#0a0910"/></svg>
+        <span id="sbBattTxt"></span>
+      </span>
+      <span class="sb-item sb-clock" id="sbClock">--:--</span>
+    </div>
+  </header>
+
+  <!-- Conteúdo principal (renderizado por shell.js) -->
+  <main id="screen"></main>
+
+  <!-- Barra de dicas de botões -->
+  <footer id="hints">
+    <span class="hint" data-h="a"><i class="pad a">A</i><em>Confirmar</em></span>
+    <span class="hint" data-h="b"><i class="pad b">B</i><em>Voltar</em></span>
+    <span class="hint" data-h="x"><i class="pad x">X</i><em>Favorito</em></span>
+    <span class="hint" data-h="start"><i class="pad st">≡</i><em>Energia</em></span>
+  </footer>
+
+  <!-- Overlays (menu energia, ajustes, wi-fi, teclado) -->
+  <div id="overlay" hidden></div>
+
+</div>
+
+<!-- Efeitos CRT -->
+<div class="crt-scanlines" aria-hidden="true"></div>
+<div class="crt-vignette" aria-hidden="true"></div>
+
+<script src="js/catalog.js?v=4"></script>
+<script src="bridge.js?v=4"></script>
+<script src="input.js?v=4"></script>
+<script src="shell.js?v=4"></script>
+</body>
+</html>
