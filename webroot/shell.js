@@ -96,8 +96,9 @@
       const img = new Image();
       img.onload = () => {
         el.classList.add('has-cover');
-        const ph = $('.ph', el); if (ph) ph.remove(); // some o placeholder ao carregar a arte
-        el.style.setProperty('background-image', `linear-gradient(180deg, rgba(2,5,3,0) 52%, rgba(2,5,3,.62) 100%), url("${url}")`);
+        const ph = $('.ph', el); if (ph) ph.remove();
+        el.style.setProperty('--cu', `url("${url}")`);
+        if (!$('.art', el)) el.insertAdjacentHTML('beforeend', '<i class="art"></i>');
       };
       img.onerror = next;
       img.src = url;

@@ -29,12 +29,12 @@
   </script>
   <!-- Conta/sessão: precisa vir ANTES de tudo que lê histórico, porque
        RVStore separa os dados por usuário (rv:<uid>:chave). -->
-  <script src="js/rv-config.js?v=40260922"></script>
-  <script src="js/rv-account.js?v=40260922"></script>
-  <script src="js/rv-input-mode.js?v=40260922"></script>
+  <script src="js/rv-config.js?v=50260922"></script>
+  <script src="js/rv-account.js?v=50260922"></script>
+  <script src="js/rv-input-mode.js?v=50260922"></script>
   <script>RVAccount.guard();</script>
-  <script src="js/audio.js?v=40260922"></script>
-  <script src="js/overlay-parser.js?v=40260922"></script>
+  <script src="js/audio.js?v=50260922"></script>
+  <script src="js/overlay-parser.js?v=50260922"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body, html {
@@ -693,13 +693,13 @@
 
 </style>
 </head>
-<body>
+<body class="rv-no-virtualpad">
 
 <div id="rv-loading">
   <div class="rv-bg"></div>
   <div class="rv-load-ring"><div class="rv-logo">RV</div></div>
   <div class="rv-console-title" id="rv-console-title"></div>
-  <div class="rv-name">RETROVAULT WEB</div>
+  <div class="rv-name">RETROVAULT OS</div>
   <div class="rv-slogan">Enter the classics</div>
   <div class="rv-bar-wrap"><div class="rv-bar"></div></div>
   <div class="rv-msg" id="rv-msg">Carregando emulador...</div>
@@ -3375,6 +3375,6 @@ window.addEventListener('resize',()=>{
 });
 </script>
 <!-- RetroVault OS: START+SELECT (ou HOME) volta à shell -->
-<script src="js/rv-os-exit.js?v=4"></script>
+<script src="js/rv-os-exit.js?v=5"></script>
 </body>
 </html>

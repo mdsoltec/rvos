@@ -17,3 +17,7 @@ raspios-lite.img.xz
 
 __pycache__/
 *.pyc
+
+INICIAR-CONSOLE.bat
+iniciar-console.sh
+push-git.bat
