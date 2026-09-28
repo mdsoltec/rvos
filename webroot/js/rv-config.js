@@ -40,5 +40,5 @@ window.RV_CONFIG = {
   /* ─── 5. Login obrigatório? ───
      true  = as páginas redirecionam para login.html quando não há sessão
      false = navegação livre; o login vira opcional */
-  requireLogin: true
+  requireLogin: false
 };

@@ -29,12 +29,12 @@
   </script>
   <!-- Conta/sessão: precisa vir ANTES de tudo que lê histórico, porque
        RVStore separa os dados por usuário (rv:<uid>:chave). -->
-  <script src="js/rv-config.js?v=50260922"></script>
-  <script src="js/rv-account.js?v=50260922"></script>
-  <script src="js/rv-input-mode.js?v=50260922"></script>
+  <script src="js/rv-config.js?v=7"></script>
+  <script src="js/rv-account.js?v=70260922"></script>
+  <script src="js/rv-input-mode.js?v=70260922"></script>
   <script>RVAccount.guard();</script>
-  <script src="js/audio.js?v=50260922"></script>
-  <script src="js/overlay-parser.js?v=50260922"></script>
+  <script src="js/audio.js?v=70260922"></script>
+  <script src="js/overlay-parser.js?v=70260922"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body, html {
@@ -2735,8 +2735,16 @@ function teardownControls() {
 }
 
 /* Reage a controle conectado/desconectado enquanto o jogo roda. */
+/* RetroVault OS: console de controles FÍSICOS — o pad virtual nunca entra,
+   em nenhum aparelho (touch, emulação de dispositivo, landscape...). */
+var RV_OS_PHYSICAL_CONTROLS = true;
 if (window.RVInput) {
   RVInput.onChange(info => {
+    if (RV_OS_PHYSICAL_CONTROLS) {
+      teardownControls();
+      document.body.classList.add('rv-no-virtualpad');
+      return;
+    }
     if (info.previous === null) return;           // primeira avaliação: initControls já cuida
     if (!info.show) {
       teardownControls();
@@ -2773,7 +2781,8 @@ async function initControls(force = false) {
     // PC com mouse/teclado ou QUALQUER aparelho com gamepad conectado
     // não recebe overlay nenhum: a tela fica limpa e o jogo usa o
     // controle físico (o EmulatorJS já trata gamepad nativamente).
-    if (window.RVInput && !RVInput.shouldShowVirtualPad()) {
+    // RetroVault OS: RV_OS_PHYSICAL_CONTROLS força esse caminho SEMPRE.
+    if (RV_OS_PHYSICAL_CONTROLS || (window.RVInput && !RVInput.shouldShowVirtualPad())) {
       teardownControls();
       document.body.classList.add('rv-no-virtualpad');
       return;
@@ -3375,6 +3384,6 @@ window.addEventListener('resize',()=>{
 });
 </script>
 <!-- RetroVault OS: START+SELECT (ou HOME) volta à shell -->
-<script src="js/rv-os-exit.js?v=5"></script>
+<script src="js/rv-os-exit.js?v=7"></script>
 </body>
 </html>
