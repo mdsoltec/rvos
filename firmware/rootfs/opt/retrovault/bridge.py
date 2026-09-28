@@ -26,6 +26,8 @@ import subprocess
 import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
+import ipaddress
 
 VERSION = "1.0.0"
 START = time.time()
@@ -119,15 +121,23 @@ def set_brightness(pct):
 
 def get_volume():
     out = sh("amixer -M sget Master 2>/dev/null | grep -o '\\[.*%\\]' | head -1")
+    if not out:
+        out = sh("amixer -M sget PCM 2>/dev/null | grep -o '\\[.*%\\]' | head -1")
     m = re.search(r"\[(\d+)%\]", out or "")
     return int(m.group(1)) if m else 70
 
 
 def set_volume(pct):
     pct = max(0, min(100, int(pct)))
-    sh("amixer -q -M sset Master %d%% 2>/dev/null" % pct)
-    sh("amixer -q -M sset PCM %d%% 2>/dev/null" % pct)
-    return True
+    ok = False
+    for channel in ("Master", "PCM"):
+        try:
+            result = subprocess.run(["amixer", "-q", "-M", "sset", channel, f"{pct}%"],
+                                    capture_output=True, timeout=5)
+            ok = ok or result.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return ok
 
 
 def get_ip():
@@ -199,12 +209,16 @@ class Handler(SimpleHTTPRequestHandler):
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)
+            if n < 0 or n > 4096:
+                raise ValueError("payload inválido")
             raw = self.rfile.read(n) if n else b"{}"
             return json.loads(raw.decode() or "{}")
         except Exception:
             return {}
 
     def do_GET(self):
+        if self.path.startswith("/api/") and not self._local_request():
+            return self._json({"ok": False, "error": "acesso local obrigatório"}, 403)
         if self.path == "/api/status":
             return self._json({
                 "ok": True,
@@ -227,14 +241,48 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": False, "error": str(e), "networks": []}, 500)
         return super().do_GET()  # arquivos estáticos (site)
 
+    def _local_request(self):
+        # API administrativa apenas no próprio aparelho, inclusive em --host 0.0.0.0.
+        try:
+            if not ipaddress.ip_address(self.client_address[0]).is_loopback:
+                return False
+        except ValueError:
+            return False
+        origin = self.headers.get("Origin")
+        if origin:
+            parsed = urlparse(origin)
+            try:
+                port = parsed.port or 80
+            except ValueError:
+                return False
+            if parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost") or port != self.server.server_port:
+                return False
+        return True
+
     def do_POST(self):
+        if not self._local_request():
+            return self._json({"ok": False, "error": "acesso local obrigatório"}, 403)
+        if self.headers.get("Content-Type", "").split(";", 1)[0].strip() != "application/json":
+            return self._json({"ok": False, "error": "Content-Type deve ser application/json"}, 415)
         body = self._body()
+        if not isinstance(body, dict):
+            return self._json({"ok": False, "error": "JSON inválido"}, 400)
+        try:
+            if self.path in ("/api/volume", "/api/brightness"):
+                value = int(body["value"])
+                if not 0 <= value <= 100:
+                    raise ValueError("faixa inválida")
+            elif self.path == "/api/wifi/connect":
+                if not isinstance(body.get("ssid"), str) or not 1 <= len(body["ssid"]) <= 32 or not isinstance(body.get("psk", ""), str) or len(body["psk"]) > 63:
+                    raise ValueError("credenciais inválidas")
+        except (ValueError, TypeError, KeyError):
+            return self._json({"ok": False, "error": "parâmetros inválidos"}, 400)
         if self.path == "/api/volume":
-            set_volume(body.get("value", 70))
-            return self._json({"ok": True, "value": get_volume()})
+            ok = set_volume(value)
+            return self._json({"ok": ok, "value": get_volume()}, 200 if ok else 500)
         if self.path == "/api/brightness":
-            set_brightness(body.get("value", 85))
-            return self._json({"ok": True, "value": get_brightness()})
+            ok = set_brightness(value)
+            return self._json({"ok": ok, "value": get_brightness()}, 200 if ok else 500)
         if self.path == "/api/wifi/connect":
             ok, out = wifi_connect(body.get("ssid", ""), body.get("psk", ""))
             return self._json({"ok": ok, "detail": out[-400:]}, 200 if ok else 500)
@@ -266,11 +314,12 @@ def main():
     ap = argparse.ArgumentParser(description="RetroVault OS bridge")
     ap.add_argument("--root", default="/opt/retrovault/webroot")
     ap.add_argument("--port", type=int, default=80)
+    ap.add_argument("--host", default="127.0.0.1", help="endereço da interface HTTP; em produção use loopback")
     args = ap.parse_args()
 
     Handler.root = args.root
-    srv = ThreadingHTTPServer(("0.0.0.0", args.port), Handler)
-    print(f"[retrovault-bridge] v{VERSION} servindo {args.root} em 0.0.0.0:{args.port}")
+    srv = ThreadingHTTPServer((args.host, args.port), Handler)
+    print(f"[retrovault-bridge] v{VERSION} servindo {args.root} em {args.host}:{args.port}")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

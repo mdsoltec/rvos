@@ -84,8 +84,17 @@ rm -rf /var/lib/apt/lists/*
 EOF
 chmod +x "$WORK/mnt/root/tmp/customize.sh"
 
-echo ">> sincronizando dados compartilhados do RetroVault WEB…"
-bash "$REPO/tools/sync-from-web.sh"
+if [ ! -s "$REPO/webroot/js/catalog.js" ] || [ ! -d "$REPO/webroot/assets" ] || [ ! -d "$REPO/webroot/covers" ] || [ ! -d "$REPO/webroot/cheats" ]; then
+  echo ">> dados ausentes: sincronizando com RetroVault WEB…"
+  bash "$REPO/tools/sync-from-web.sh"
+else
+  echo ">> catálogo/assets já presentes; preservando dados deste pacote."
+fi
+if [ ! -s "$REPO/webroot/vendor/emulatorjs/loader.js" ]; then
+  echo ">> baixando EmulatorJS para uso offline…"
+  bash "$REPO/tools/fetch-emulatorjs.sh"
+fi
+[ -s "$REPO/webroot/vendor/emulatorjs/loader.js" ] || { echo "loader do EmulatorJS ausente"; exit 1; }
 echo ">> copiando sistema (webroot) + rootfs…"
 mkdir -p "$WORK/mnt/root/opt/retrovault/webroot"
 cp -rL "$REPO/webroot/." "$WORK/mnt/root/opt/retrovault/webroot/"

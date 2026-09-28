@@ -3,9 +3,8 @@
 Firmware único para o console portátil RetroVault: **Raspberry Pi OS Lite (64-bit) →
 bridge (este diretório) → Chromium kiosk em Wayland (cage) → `/` (a própria shell)**.
 
-O console liga e cai direto na interface RetroVault OS, navegável 100% pelos
-botões físicos. Os jogos rodam no **mesmo `player.html` da versão web** — saves,
-overlays e EmulatorJS idênticos, sem duplicar código.
+O console liga e cai direto na interface RetroVault OS, navegável pelos
+botões físicos. Os jogos rodam no **fork local do player da versão web** — saves e EmulatorJS; não há login nem nuvem no OS.
 
 ```
 ┌────────────────────────── hardware ──────────────────────────┐
@@ -22,7 +21,7 @@ overlays e EmulatorJS idênticos, sem duplicar código.
 
 ## Por que assim (e não EmulationStation/RetroArch)
 
-- **Zero duplicação**: catálogo, capas, fichas, saves, sync (Firestore) e o
+- **Zero duplicação**: catálogo, capas, fichas, saves, sync (somente na versão web) e o
   player EmulatorJS são os da web. Jogo novo no `catalog.js` aparece no console.
 - **Firmware único**: uma imagem `.img` gravada no SD é o produto inteiro.
 - **Atualização OTA trivial**: o "sistema" é um site estático — atualizar é
@@ -87,14 +86,14 @@ a shell detecta sozinha e roda em **modo simulação** (indicado na barra).
 
 ```bash
 ssh rv@<ip-do-console>  # habilite o ssh no primeiro acesso
-cd /opt/retrovault && sudo git pull        # ou baixe um release .tar.gz
-sudo reboot
+# O build copia os arquivos, mas NÃO inclui um checkout Git no aparelho.
+# Copie um release autenticado para /opt/retrovault e reinicie a bridge/kiosk.
+sudo systemctl restart retrovault-bridge retrovault-shell
 ```
 
 ## Segurança (antes de vender/distribuir)
 
-- A bridge escuta em `0.0.0.0:80`. Para produção, trave em `127.0.0.1`
-  (edite `bridge.py`: `ThreadingHTTPServer(("127.0.0.1", ...))`) e suba um
-  servidor separado para o modo "rede local", se quiser um.
+- A bridge já escuta apenas em `127.0.0.1:80` por padrão, inclusive no serviço systemd.
+  Evite `--host 0.0.0.0` no aparelho: a API é para uso local.
 - Troque a senha do usuário `rv` e desabilite SSH na imagem de produção.
 - Distribua **sem ROMs** — cada usuário copia as próprias (como na web).

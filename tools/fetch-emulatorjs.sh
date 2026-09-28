@@ -22,8 +22,7 @@ trap 'rm -rf "$TMP"' EXIT
 echo ">> alvo: $DEST"
 mkdir -p "$DEST"
 
-if git clone --depth 1 --branch "$VER" https://github.com/EmulatorJS/EmulatorJS.git "$TMP" 2>/dev/null \
-|| git clone --depth 1 https://github.com/EmulatorJS/EmulatorJS.git "$TMP"; then
+if git clone --depth 1 --branch "$VER" https://github.com/EmulatorJS/EmulatorJS.git "$TMP" 2>/dev/null; then
   if [ -f "$TMP/data/loader.js" ]; then
     cp -r "$TMP/data/." "$DEST/"
     echo "✔ EmulatorJS $VER copiado do repositório oficial ($(du -sh "$DEST" | cut -f1))"

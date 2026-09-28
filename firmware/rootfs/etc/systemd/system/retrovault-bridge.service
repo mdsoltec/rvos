@@ -5,7 +5,7 @@ Wants=NetworkManager.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /opt/retrovault/bridge.py --root /opt/retrovault/public --port 80
+ExecStart=/usr/bin/python3 /opt/retrovault/bridge.py --root /opt/retrovault/webroot --host 127.0.0.1 --port 80
 Restart=always
 RestartSec=2
 # device: precisa de root p/ amixer, backlight, nmcli e systemctl poweroff

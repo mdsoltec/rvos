@@ -6,12 +6,9 @@
   <link rel="icon" type="image/png" href="assets/rv-icon.png">
   <link rel="apple-touch-icon" href="assets/rv-icon.png">
   <link rel="manifest" href="manifest.json">
-  <!-- Boot rápido: abre a conexão com o CDN dos núcleos antes de o jogo pedir -->
-  <link rel="preconnect" href="https://cdn.emulatorjs.org" crossorigin>
-  <link rel="dns-prefetch" href="https://cdn.emulatorjs.org">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="icons.css?v=8">
+  <script src="icons.js?v=8"></script>
   <title>RetroVault OS</title>
   <!-- Defesa: o EmulatorJS consulta MediaRecorder.isTypeSupported SEM checar
        se a API existe. Em navegadores sem MediaRecorder (WebKit/Safari antigo,
@@ -29,12 +26,12 @@
   </script>
   <!-- Conta/sessão: precisa vir ANTES de tudo que lê histórico, porque
        RVStore separa os dados por usuário (rv:<uid>:chave). -->
-  <script src="js/rv-config.js?v=7"></script>
-  <script src="js/rv-account.js?v=70260922"></script>
-  <script src="js/rv-input-mode.js?v=70260922"></script>
+  <script src="js/rv-config.js?v=6"></script>
+  <script src="js/rv-account.js?v=50260922"></script>
+  <script src="js/rv-input-mode.js?v=50260922"></script>
   <script>RVAccount.guard();</script>
-  <script src="js/audio.js?v=70260922"></script>
-  <script src="js/overlay-parser.js?v=70260922"></script>
+  <script src="js/audio.js?v=50260922"></script>
+  <script src="js/overlay-parser.js?v=50260922"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body, html {
@@ -267,11 +264,14 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+    .rv-qm-toggle .rv-icon, #rv-fs-btn .rv-icon, .rv-float-btn .rv-icon { fill:none; stroke:#00ff41; stroke-width:1.8; }
     .rv-toast .rv-inline-icon {
       width: 1.05em; height: 1.05em;
       vertical-align: -0.23em;
       margin-right: 8px;
     }
+
+    .rv-toast .rv-inline-icon { fill:none; stroke:#00ff41; }
 
     /* ═══ MENU DE CHEATS SOBRE TODOS OS CONTROLES ═══ */
     body.rv-cheats-open .ejs_popup_container {
@@ -713,23 +713,23 @@
 <!-- MINI-MENU FLUTUANTE (recolhido: só o ⋮; aberto: Tela cheia/Screenshot/Theater/Saves) -->
 <div class="rv-qm" id="rv-qm">
   <button class="rv-qm-toggle" id="rv-qm-toggle" title="Opções de tela" aria-label="Opções de tela" aria-expanded="false">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg>
+    <span data-rv-icon="menu"></span>
   </button>
   <div class="rv-float-btns" id="rv-float-btns">
     <div id="rv-fs-btn" title="Tela cheia">
-      <svg viewBox="0 0 24 24"><path d="M3 3h6v2H5v4H3V3zm12 0h6v6h-2V5h-4V3zM3 15h2v4h4v2H3v-6zm16 4h-4v2h6v-6h-2v4z"/></svg>
+      <span data-rv-icon="fullscreen"></span>
     </div>
     <div class="rv-float-btn" id="rv-screenshot-btn" title="Screenshot">
-      <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+      <span data-rv-icon="screenshot"></span>
     </div>
     <div class="rv-float-btn" id="rv-theater-btn" title="Modo Theater">
-      <svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+      <span data-rv-icon="theater"></span>
     </div>
     <!-- MENU (Salvar/Carregar/Reset/Turbo/Sair). Essencial no PC e quando há
          controle conectado: sem o overlay na tela, não existiria outro caminho
          para a barra de sistema do RetroVault Web. -->
     <div class="rv-float-btn" id="rv-sysbar-btn" title="Saves — Salvar, Carregar, Reset (segure F1)">
-      <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+      <span data-rv-icon="menu"></span>
     </div>
   </div>
 </div>
@@ -2133,6 +2133,22 @@ EJS_startOnLoaded = true; EJS_fullscreenOnLoaded = false;
   }, true);
   window.__rvAutoCapture = capturarAuto;
 
+  // O menu físico pode retomar mesmo depois que o aviso de retomada foi fechado.
+  window.__rvResumeAuto = async function () {
+    try {
+      const rec = await rvSaveGet(autoKey());
+      const gm = window.EJS_emulator && window.EJS_emulator.gameManager;
+      if (!rec || !rec.state || !gm || typeof gm.loadState !== 'function') return false;
+      const raw = rec.state;
+      const bytes = raw instanceof Uint8Array ? raw : ArrayBuffer.isView(raw)
+        ? new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength) : new Uint8Array(raw);
+      rvUnfreezeCore(); await rvTick(120);
+      await Promise.resolve(gm.loadState(bytes));
+      await rvTick(60);
+      return true;
+    } catch (e) { console.warn('[RetroVault OS] Falha ao retomar checkpoint:', e); return false; }
+  };
+
   function montarBarraResume(rec) {
     const barra = document.createElement('div'); barra.id = 'rv-resume';
     const txt = document.createElement('div'); txt.className = 'rv-resume-txt';
@@ -2694,8 +2710,7 @@ if (isArcade) {
   }
 }());
 
-/* Register Service Worker (PWA) — sw.js na raiz; só intercepta GET same-origin
-   (ROMs/CDN passam direto), então não interfere no boot do emulador. */
+/* SW exclusivo do OS: ignora /roms e /api (não cachear dados/sistema). */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => { });
 }
@@ -2735,16 +2750,8 @@ function teardownControls() {
 }
 
 /* Reage a controle conectado/desconectado enquanto o jogo roda. */
-/* RetroVault OS: console de controles FÍSICOS — o pad virtual nunca entra,
-   em nenhum aparelho (touch, emulação de dispositivo, landscape...). */
-var RV_OS_PHYSICAL_CONTROLS = true;
 if (window.RVInput) {
   RVInput.onChange(info => {
-    if (RV_OS_PHYSICAL_CONTROLS) {
-      teardownControls();
-      document.body.classList.add('rv-no-virtualpad');
-      return;
-    }
     if (info.previous === null) return;           // primeira avaliação: initControls já cuida
     if (!info.show) {
       teardownControls();
@@ -2781,8 +2788,7 @@ async function initControls(force = false) {
     // PC com mouse/teclado ou QUALQUER aparelho com gamepad conectado
     // não recebe overlay nenhum: a tela fica limpa e o jogo usa o
     // controle físico (o EmulatorJS já trata gamepad nativamente).
-    // RetroVault OS: RV_OS_PHYSICAL_CONTROLS força esse caminho SEMPRE.
-    if (RV_OS_PHYSICAL_CONTROLS || (window.RVInput && !RVInput.shouldShowVirtualPad())) {
+    if (window.RVInput && !RVInput.shouldShowVirtualPad()) {
       teardownControls();
       document.body.classList.add('rv-no-virtualpad');
       return;
@@ -3210,7 +3216,7 @@ function showToast(msg, icon) {
   const toast = document.getElementById('rv-toast');
   if (!toast) return;
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  toast.innerHTML = (icon ? '<img class="rv-inline-icon" src="assets/icons/' + icon + '.svg" alt="">' : '') + esc(msg);
+  toast.innerHTML = (icon && RVIcons.names.includes(icon) ? RVIcons.render(icon, 'rv-inline-icon') : '') + esc(msg);
   toast.classList.add('show');
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => toast.classList.remove('show'), 2500);
@@ -3384,6 +3390,6 @@ window.addEventListener('resize',()=>{
 });
 </script>
 <!-- RetroVault OS: START+SELECT (ou HOME) volta à shell -->
-<script src="js/rv-os-exit.js?v=7"></script>
+<script src="js/rv-os-exit.js?v=8"></script>
 </body>
 </html>

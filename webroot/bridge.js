@@ -8,20 +8,21 @@
 (function () {
   'use strict';
 
-  const TIMEOUT = 900;
+  const TIMEOUT = 2500;
   let available = null; // null = ainda não detectado
 
-  function req(path, opts) {
+  function req(path, opts, timeout = TIMEOUT) {
     return new Promise((resolve, reject) => {
       const ctl = new AbortController();
-      const t = setTimeout(() => { ctl.abort(); reject(new Error('timeout')); }, TIMEOUT);
+      const t = setTimeout(() => { ctl.abort(); reject(new Error('timeout')); }, timeout);
       fetch(path, Object.assign({ signal: ctl.signal }, opts || {}))
         .then(r => { clearTimeout(t); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+        .then(r => { if (r.ok === false) throw new Error(r.error || r.detail || 'Falha na API'); return r; })
         .then(resolve, (e) => { clearTimeout(t); reject(e); });
     });
   }
-  function post(path, body) {
-    return req(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  function post(path, body, timeout) {
+    return req(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }, timeout);
   }
 
   /* ── Estado simulado (preview/dev fora do hardware) ── */
@@ -71,12 +72,12 @@
     },
 
     async wifiScan() {
-      if (available) return req('/api/wifi/scan');
+      if (available) return req('/api/wifi/scan', null, 18000);
       return { ok: true, networks: sim.nets };
     },
 
     async wifiConnect(ssid, psk) {
-      if (available) return post('/api/wifi/connect', { ssid: ssid, psk: psk || '' });
+      if (available) return post('/api/wifi/connect', { ssid: ssid, psk: psk || '' }, 45000);
       await new Promise(r => setTimeout(r, 1200)); // finge handshake
       sim.wifi = { connected: true, ssid: ssid, signal: 75 };
       sim.nets.forEach(n => n.connected = n.ssid === ssid);

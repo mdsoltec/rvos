@@ -1,7 +1,7 @@
 {
-  "name": "RetroVault Web - Enter The Classics",
-  "short_name": "RetroVault Web",
-  "description": "Plataforma de emulação de jogos retro e streaming no navegador. 13 consoles, 195+ jogos",
+  "name": "RetroVault OS",
+  "short_name": "RetroVault OS",
+  "description": "Interface local do console RetroVault: catálogo, favoritos e jogos com suporte a controle físico.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",

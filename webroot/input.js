@@ -38,6 +38,8 @@
   let padState = {};               // índice do botão → {t0, last}
   let axisState = { x: 0, y: 0 };  // direção atual do analógico
   let comboStart = 0;              // combo START+SELECT
+  let comboSuppressed = false;      // não emitir START/SELECT ao soltar o combo
+  let comboFired = false;
   let enabled = true;
 
   function emit(action) {
@@ -54,18 +56,17 @@
     for (const p of pads) if (p && p.connected) { gp = p; break; }
     const now = performance.now();
 
-    // Combo START+SELECT (segurar 700ms) → ação "home" (menu de energia)
-    if (gp) {
-      const st = gp.buttons[BTN.START] && gp.buttons[BTN.START].pressed;
-      const se = gp.buttons[BTN.SELECT] && gp.buttons[BTN.SELECT].pressed;
-      if (st && se) {
-        if (!comboStart) comboStart = now;
-        else if (now - comboStart > 700) { comboStart = -1; emit('home'); }
-      } else if (comboStart && comboStart > 0) {
-        // soltou antes: trata como START normal
-        comboStart = 0; emit('start');
-      } else { comboStart = 0; }
-    }
+    // START/SELECT individuais disparam ao SOLTAR: isso impede que um combo
+    // também abra o menu de energia enquanto o jogador tenta ir para HOME.
+    const stPressed = !!(gp && gp.buttons[BTN.START] && gp.buttons[BTN.START].pressed);
+    const sePressed = !!(gp && gp.buttons[BTN.SELECT] && gp.buttons[BTN.SELECT].pressed);
+    if (stPressed && sePressed) {
+      if (!comboStart) { comboStart = now; comboSuppressed = true; }
+      if (!comboFired && now - comboStart >= 700) {
+        comboFired = true;
+        emit('home');
+      }
+    } else comboStart = 0;
 
     // Botões digitais com auto-repeat
     for (const bi in ACTION_OF_BTN) {
@@ -81,9 +82,12 @@
           st.last = now; emit(act);
         }
       } else if (!pressed && st) {
-        if (bi == BTN.SELECT) delete padState[bi]; else delete padState[bi];
+        if ((bi == BTN.SELECT || bi == BTN.START) && !comboSuppressed) emit(ACTION_OF_BTN[bi]);
+        delete padState[bi];
       }
     }
+
+    if (!stPressed && !sePressed) { comboSuppressed = false; comboFired = false; }
 
     // Analógico esquerdo → direções
     if (gp && gp.axes.length >= 2) {
@@ -91,7 +95,7 @@
       const ay = Math.abs(gp.axes[1]) > AXIS_DEAD ? Math.sign(gp.axes[1]) : 0;
       handleAxis('x', ax === -1 ? 'left' : ax === 1 ? 'right' : null, now);
       handleAxis('y', ay === -1 ? 'up'   : ay === 1 ? 'down'  : null, now);
-    }
+    } else { axisState.x = 0; axisState.y = 0; }
   }
 
   function handleAxis(k, dir, now) {

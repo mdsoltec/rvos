@@ -10,6 +10,7 @@
   /* ─────────────────── utilitários ─────────────────── */
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const icon = (name, cls) => RVIcons.render(name, cls);
   function h(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   function store(key, val) { if (val === undefined) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } } localStorage.setItem(key, JSON.stringify(val)); }
@@ -123,8 +124,88 @@
     el.innerHTML = `<span class="ph">${esc(ini)}</span>`;
   }
 
+  /* ── Disponibilidade local: HEAD não baixa ROM para descobrir se existe ── */
+  const localRoms = new Map(); // null = em consulta; true/false = resultado
+  const romQueue = [];
+  let activeRomChecks = 0, libraryRefresh = null;
+  function romKey(sysId, g) { return sysId + ':' + g.file; }
+  function romUrl(sysId, g) {
+    return 'roms/' + [sysId, ...g.file.split('/')].map(encodeURIComponent).join('/');
+  }
+  function romLabel(value) {
+    return value === true ? 'NO CARTÃO' : value === null ? 'VERIFICANDO…' :
+      statusCache.wifi && statusCache.wifi.connected ? 'SÓ VIA REDE*' : 'SEM ROM LOCAL';
+  }
+  function updateRomBadge(sysId, g) {
+    const key = romKey(sysId, g), available = localRoms.get(key);
+    $$('.game-card').forEach(card => {
+      if (card.dataset.gameSys !== sysId || card.dataset.file !== g.file) return;
+      const badge = $('.rom-badge', card);
+      if (badge) { badge.textContent = romLabel(available); badge.classList.toggle('on-card', available === true); }
+    });
+    const hero = $('.hero-continue');
+    if (hero && hero.dataset.sys === sysId && hero.dataset.file === g.file) {
+      const badge = $('.hero-availability', hero); if (badge) badge.textContent = romLabel(available);
+    }
+    if (top() === consoleScreen && consoleScreen.filter === 'local') {
+      clearTimeout(libraryRefresh);
+      libraryRefresh = setTimeout(() => {
+        if (top() !== consoleScreen) return;
+        consoleScreen.render();
+        consoleScreen.defaultFocus();
+      }, 180);
+    }
+  }
+  function queueRomCheck(sysId, g) {
+    const key = romKey(sysId, g);
+    if (localRoms.has(key)) return;
+    localRoms.set(key, null);
+    romQueue.push({ sysId, g });
+    pumpRomChecks();
+  }
+  function pumpRomChecks() {
+    while (activeRomChecks < 5 && romQueue.length) {
+      const { sysId, g } = romQueue.shift();
+      activeRomChecks++;
+      fetch(romUrl(sysId, g), { method: 'HEAD', cache: 'no-store' })
+        .then(response => localRoms.set(romKey(sysId, g), response.ok))
+        .catch(() => localRoms.set(romKey(sysId, g), false))
+        .finally(() => { activeRomChecks--; updateRomBadge(sysId, g); pumpRomChecks(); });
+    }
+  }
+
+  /* Save-states ficam no IndexedDB do player; a shell só lê os metadados. */
+  let savesDbPromise;
+  function readSaveDate(sysId, g) {
+    if (!('indexedDB' in window)) return Promise.resolve(null);
+    // Não criar um banco vazio: o player precisa poder inicializar o schema.
+    if (!savesDbPromise) savesDbPromise = (indexedDB.databases ? indexedDB.databases() : Promise.resolve([]))
+      .then(list => new Promise(resolve => {
+        if (!list.some(item => item.name === 'RetroVault-saves')) return resolve(null);
+        const req = indexedDB.open('RetroVault-saves');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      })).catch(() => null);
+    return savesDbPromise.then(db => new Promise(resolve => {
+      if (!db || !db.objectStoreNames.contains('saves')) return resolve(null);
+      const core = (CAT[sysId] && CAT[sysId].core) || sysId;
+      const key = 'convidado::' + core + '|' + sysId + '/' + g.file;
+      const tx = db.transaction('saves', 'readonly');
+      const request = tx.objectStore('saves').get(key);
+      request.onsuccess = () => resolve(request.result && request.result.savedAt || null);
+      request.onerror = () => resolve(null);
+    }));
+  }
+  function showSaveBadge(container, sysId, g) {
+    readSaveDate(sysId, g).then(date => {
+      if (!date || !container.isConnected) return;
+      const el = h('span', 'save-badge', '● SAVE ' + new Date(date).toLocaleDateString('pt-BR'));
+      container.appendChild(el);
+    });
+  }
+
   /* ─────────────────── navegação espacial ─────────────────── */
-  function focusables(container) { return $$('.focusable', container || document).filter(e => e.offsetParent !== null); }
+  function focusables(container) { const root = typeof container === 'string' ? $(container) : container; return root ? $$('.focusable', root).filter(e => e.offsetParent !== null) : []; }
   let focusedEl = null;
   function setFocus(el, silent) {
     if (focusedEl) focusedEl.classList.remove('focused');
@@ -159,10 +240,10 @@
 
   /* ─────────────────── toast ─────────────────── */
   let toastTimer = null;
-  function toast(msg, ms) {
+  function toast(msg, ms, iconName) {
     let t = $('#toast');
     if (!t) { t = h('div'); t.id = 'toast'; document.body.appendChild(t); }
-    t.textContent = msg; t.classList.add('show');
+    t.innerHTML = (iconName ? icon(iconName) : '') + `<span>${esc(msg)}</span>`; t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove('show'), ms || 2200);
   }
@@ -196,13 +277,21 @@
     card.appendChild(h('div', 'sys-meta', `<div class="sys-name">${esc(info.name || id)}</div><div class="sys-count">${info.games.length} jogos</div>`));
     return card;
   }
-  function utilCard(kind, glyph, name, count, col) {
+  function utilCard(kind, iconName, name, count, col) {
     col = col || '#00ff41';
     const card = h('div', 'sys-card sys-util focusable');
     card.tabIndex = -1; card.dataset.sys = kind;
     card.style.setProperty('--sc', col);
     card.style.background = `radial-gradient(120% 150% at 50% 118%, ${rgba(col, 0.5)} 0%, ${shade(col, 0.22)} 46%, ${shade(col, 0.08)} 100%)`;
-    card.insertAdjacentHTML('beforeend', `<div class="sys-art">${glyph}</div>`);
+    const art = h('div', 'sys-art');
+    if (kind === '@settings') {
+      // Mesma hierarquia visual dos consoles: arte PNG no centro, não um glifo pequeno.
+      const image = h('img');
+      image.src = 'ui/system-gear.png'; image.alt = ''; image.draggable = false;
+      image.onerror = () => { art.innerHTML = icon('system', 'sys-glyph'); };
+      art.appendChild(image);
+    } else art.innerHTML = icon(iconName, 'sys-glyph');
+    card.appendChild(art);
     card.appendChild(h('div', 'sys-top', name.toUpperCase().slice(0, 8)));
     card.appendChild(h('div', 'sys-meta', `<div class="sys-name">${esc(name)}</div><div class="sys-count">${esc(count)}</div>`));
     return card;
@@ -215,9 +304,10 @@
       ambient(null); // home = verde da marca
 
       // ── Continuar jogando (hero) ──
-      if (recents.length) {
-        const r = recents[0];
-        const g = (CAT[r.sys].games || []).find(x => x.file === r.file) || { name: r.name, file: r.file };
+      const latest = recents.find(r => CAT[r.sys] && (CAT[r.sys].games || []).some(g => g.file === r.file));
+      if (latest) {
+        const r = latest;
+        const g = (CAT[r.sys].games || []).find(x => x.file === r.file);
         scr.appendChild(h('div', 'row-title', 'Continuar jogando'));
         const hero = h('div', 'hero-continue focusable');
         hero.tabIndex = -1; hero.dataset.launch = '1'; hero.dataset.sys = r.sys; hero.dataset.file = r.file;
@@ -229,6 +319,8 @@
         hero.appendChild(shadeEl);
         const cover = h('div', 'hero-cover'); applyCover(cover, r.sys, g); hero.appendChild(cover);
         hero.appendChild(h('div', 'hero-glow')).style.background = col;
+        const last = h('span', 'hero-availability', romLabel(localRoms.get(romKey(r.sys, g))));
+        hero.appendChild(last); queueRomCheck(r.sys, g); showSaveBadge(hero, r.sys, g);
         hero.appendChild(h('div', 'hero-meta',
           `<span class="hero-chip">Continuar</span>
            <div class="hero-title">${esc(r.name)}${r.sub ? ` <span style="opacity:.65;font-weight:600;font-size:.72em">${esc(r.sub)}</span>` : ''}</div>
@@ -240,8 +332,8 @@
       scr.appendChild(h('div', 'row-title', 'Consoles'));
       const grid = h('div', 'sys-grid'); grid.id = 'sysGrid';
       SYS_IDS.forEach(id => grid.appendChild(sysCard(id)));
-      if (favs.size) grid.appendChild(utilCard('@fav', '♥', 'Favoritos', favs.size + ' jogos', '#ff5d7e'));
-      grid.appendChild(utilCard('@settings', '⚙', 'Sistema', 'ajustes'));
+      if (favs.size) grid.appendChild(utilCard('@fav', 'heart', 'Favoritos', favs.size + ' jogos', '#ff5d7e'));
+      grid.appendChild(utilCard('@settings', 'system', 'Sistema', 'ajustes'));
       scr.appendChild(grid);
       return scr;
     },
@@ -256,8 +348,8 @@
       if (a === 'x' && focusedEl && focusedEl.dataset.launch) { // favorito do hero
         const { sys, file } = focusedEl.dataset;
         const key = sys + ':' + file;
-        if (favs.has(key)) { favs.delete(key); toast('Removido dos favoritos'); }
-        else { favs.add(key); toast('Adicionado aos favoritos ♥'); }
+        if (favs.has(key)) { favs.delete(key); toast('Removido dos favoritos', 2200, 'heart'); }
+        else { favs.add(key); toast('Adicionado aos favoritos', 2200, 'heart'); }
         saveFavs(); Sound.confirm();
         return;
       }
@@ -294,22 +386,24 @@
     placeholder(cov, sysId, g); applyCover(cov, sysId, g);
     card.appendChild(cov);
     card.appendChild(h('div', 'meta', `<span class="t">${esc(g.name)}</span>${g.subtitle ? `<span class="s">${esc(g.subtitle)}</span>` : ''}`));
+    const badge = h('span', 'rom-badge' + (localRoms.get(romKey(sysId, g)) === true ? ' on-card' : ''), romLabel(localRoms.get(romKey(sysId, g))));
+    card.appendChild(badge); queueRomCheck(sysId, g); showSaveBadge(card, sysId, g);
     if (showChip) card.appendChild(h('span', 'chip', esc(sysShort(sysId))));
-    if (favs.has(sysId + ':' + g.file)) card.appendChild(h('img', 'fav')).src = 'assets/icons/heart-red.svg';
+    if (favs.has(sysId + ':' + g.file)) card.appendChild(h('span', 'fav', icon('heart')));
     return card;
   }
 
   const consoleScreen = {
-    sysId: null, custom: null, title: '', isFav: false,
+    sysId: null, custom: null, title: '', isFav: false, filter: 'all', query: '',
     open(id) {
-      this.sysId = id; this.custom = null; this.isFav = false;
+      this.sysId = id; this.custom = null; this.isFav = false; this.filter = 'all'; this.query = '';
       this.title = CAT[id].name || id;
       pushCtx(this);
     },
     openFavorites() {
       const list = [];
       SYS_IDS.forEach(id => (CAT[id].games || []).forEach(g => { if (favs.has(id + ':' + g.file)) list.push({ sys: id, g }); }));
-      this.sysId = '@fav'; this.custom = list; this.isFav = true;
+      this.sysId = '@fav'; this.custom = list; this.isFav = true; this.filter = 'all'; this.query = '';
       this.title = 'Meus Favoritos';
       pushCtx(this);
     },
@@ -319,13 +413,13 @@
       const col = this.isFav ? '#ff5d7e' : sysColor(this.sysId);
       ambient(col); // topo da tela ganha a cor do console
       const n = this.isFav ? this.custom.length : (CAT[this.sysId].games || []).length;
-      const artImg = this.isFav ? 'assets/icons/heart-red.svg' : sysArt(this.sysId);
-      const ghost = this.isFav ? '♥' : esc(sysShort(this.sysId));
+      const artImg = this.isFav ? null : sysArt(this.sysId);
+      const ghost = this.isFav ? icon('heart') : esc(sysShort(this.sysId));
 
       const hero = h('div', 'console-hero');
       hero.style.background = `linear-gradient(100deg, ${shade(col, 0.30)} 0%, ${shade(col, 0.10)} 70%, ${shade(col, 0.06)} 100%)`;
       hero.style.borderColor = shade(col, 0.65);
-      hero.innerHTML = `<img src="${artImg}" alt="" draggable="false" onerror="this.style.display='none'">
+      hero.innerHTML = `${artImg ? `<img src="${artImg}" alt="" draggable="false" onerror="this.style.display='none'">` : `<span class="ch-fav-art">${icon('heart')}</span>`}
         <div class="ch-meta">
           <div class="ch-name" style="text-shadow:0 0 22px ${col}66">${esc(this.title)}</div>
           <div class="ch-sub">${n} ${n === 1 ? 'jogo' : 'jogos'}</div>
@@ -334,10 +428,34 @@
         <div class="ch-ghost">${ghost}</div>`;
       scr.appendChild(hero);
 
-      if (!n) { scr.appendChild(h('div', 'empty-note', 'Nada por aqui ainda — marque jogos com X para vê-los em Favoritos.')); return scr; }
+      // Filtros navegáveis pelo controle; os jogos permanecem acessíveis sem rede.
+      const tools = h('div', 'library-tools');
+      [['all', 'Todos'], ['local', 'No cartão'], ['recent', 'Recentes'], ['favs', 'Favoritos']].forEach(([id, text]) => {
+        const btn = h('div', 'library-filter focusable' + (this.filter === id ? ' active' : ''), text);
+        btn.dataset.filter = id; btn.tabIndex = -1; tools.appendChild(btn);
+      });
+      const search = h('div', 'library-filter library-search focusable', icon('search') + `<span>${this.query ? esc(this.query) : 'Buscar jogo'}</span>`);
+      search.dataset.search = '1'; search.tabIndex = -1; tools.appendChild(search);
+      scr.appendChild(tools);
+      const all = this.isFav ? this.custom : (CAT[this.sysId].games || []).map(g => ({ sys: this.sysId, g }));
+      // Consulta todas as ROMs da aba em grupos pequenos, inclusive as ocultas pelo filtro.
+      all.forEach(it => queueRomCheck(it.sys, it.g));
+      const q = this.query.trim().toLocaleLowerCase('pt-BR');
+      const recentKeys = new Set(recents.map(r => r.sys + ':' + r.file));
+      const visible = all.filter(({ sys, g }) => {
+        const key = romKey(sys, g);
+        if (this.filter === 'local' && localRoms.get(key) !== true) return false;
+        if (this.filter === 'recent' && !recentKeys.has(key)) return false;
+        if (this.filter === 'favs' && !favs.has(key)) return false;
+        return !q || (g.name + ' ' + (g.subtitle || '')).toLocaleLowerCase('pt-BR').includes(q);
+      });
+      scr.appendChild(h('div', 'library-count', `${visible.length} ${visible.length === 1 ? 'jogo' : 'jogos'} exibidos${this.filter === 'local' && all.some(it => localRoms.get(romKey(it.sys, it.g)) === null) ? ' · verificando cartão…' : ''} · *Disponibilidade online não verificada`));
+      if (!visible.length) {
+        scr.appendChild(h('div', 'empty-note', this.filter === 'local' ? 'Nenhuma ROM local encontrada (ou verificação em andamento). Use o filtro Todos para ver o catálogo.' : 'Nenhum jogo encontrado neste filtro.'));
+        return scr;
+      }
       const grid = h('div', 'game-grid'); grid.id = 'gameGrid';
-      if (this.isFav) this.custom.forEach(it => grid.appendChild(gameCard(it.sys, it.g, true))); // chip do console só faz sentido misturado
-      else (CAT[this.sysId].games || []).forEach(g => grid.appendChild(gameCard(this.sysId, g, false)));
+      visible.forEach(it => grid.appendChild(gameCard(it.sys, it.g, this.isFav)));
       scr.appendChild(grid);
       return scr;
     },
@@ -345,7 +463,7 @@
       if (this.isFav) return Sound.err();
       const i = SYS_IDS.indexOf(this.sysId);
       const next = SYS_IDS[(i + dir + SYS_IDS.length) % SYS_IDS.length];
-      this.sysId = next; this.title = CAT[next].name || next;
+      this.sysId = next; this.title = CAT[next].name || next; this.filter = 'all'; this.query = '';
       ui.lastConsole = next; store('rvos:ui:lastConsole', next);
       Sound.open(); this.render(); this.defaultFocus();
     },
@@ -371,11 +489,18 @@
         if (favs.has(key)) {
           favs.delete(key);
           const f = $('.fav', focusedEl); if (f) f.remove();
-          toast('Removido dos favoritos');
+          toast('Removido dos favoritos', 2200, 'heart');
           if (this.isFav) { const nx = focusedEl.nextElementSibling || focusedEl.previousElementSibling; focusedEl.remove(); if (nx && nx.classList.contains('game-card')) setFocus(nx, true); }
-        } else { favs.add(key); focusedEl.appendChild(h('img', 'fav')).src = 'assets/icons/heart-red.svg'; toast('Adicionado aos favoritos ♥'); }
+        } else { favs.add(key); focusedEl.appendChild(h('span', 'fav', icon('heart'))); toast('Adicionado aos favoritos', 2200, 'heart'); }
         saveFavs(); Sound.confirm();
         return;
+      }
+      if (a === 'a' && focusedEl && focusedEl.dataset.filter) {
+        this.filter = focusedEl.dataset.filter; this.render();
+        setFocus($(`.library-filter[data-filter="${this.filter}"]`), true); Sound.confirm(); return;
+      }
+      if (a === 'a' && focusedEl && focusedEl.dataset.search) {
+        pushKeyboard('Buscar jogo', v => { this.query = v.trim(); this.render(); this.defaultFocus(); }, false); return;
       }
       if (a === 'a' && focusedEl && focusedEl.dataset.file) {
         const sys = focusedEl.dataset.gameSys, file = focusedEl.dataset.file;
@@ -386,6 +511,7 @@
     defaultFocus() {
       const first = $('#gameGrid .game-card');
       if (first) setFocus(first, true);
+      else setFocus($('.library-filter'), true);
     },
   };
 
@@ -407,30 +533,30 @@
     render() {
       const scr = $('#screen');
       scr.innerHTML = '';
-      scr.appendChild(h('div', 'row-title', '<span class="accent">⚙</span> Ajustes do sistema'));
+      scr.appendChild(h('div', 'row-title', `<span class="accent">${icon('system')}</span> Ajustes do sistema`));
       const panel = h('div', 'full-panel');
       const body = h('div', 'ov-body'); body.id = 'setBody';
       body.appendChild(h('div', 'back-line', '<b>B</b> voltar · ←/→ ajustar valores'));
       panel.appendChild(body);
       scr.appendChild(panel);
 
-      const mk = (id, type, icon, lbl, sub) => {
+      const mk = (id, type, iconName, lbl, sub) => {
         const it = h('div', 'set-item focusable');
         it.tabIndex = -1; it.dataset.set = id; it.dataset.type = type;
-        it.innerHTML = `<span class="ic">${icon}</span><div><div class="lbl">${lbl}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+        it.innerHTML = `<span class="ic">${icon(iconName)}</span><div><div class="lbl">${lbl}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
         if (type === 'bar') it.insertAdjacentHTML('beforeend', `<span class="val"><span class="val-bar"><i style="width:0%"></i></span><span class="num">0%</span></span>`);
-        else it.insertAdjacentHTML('beforeend', `<span class="arrow">›</span>`);
+        else it.insertAdjacentHTML('beforeend', `<span class="arrow">${icon('chevronRight')}</span>`);
         body.appendChild(it);
         return it;
       };
 
-      const I = (path) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="${path}"/></svg>`;
-      mk('wifi', 'go', I('M12 21l3.5-4.5c-.9-.7-2.1-1.2-3.5-1.2s-2.6.4-3.5 1.2L12 21zm0-18C7.4 3 3.2 4.7 0 7.6l2 2.5C4.6 8 8.1 6.5 12 6.5s7.4 1.5 10 3.6l2-2.5C20.8 4.7 16.6 3 12 3z'), 'Wi-Fi', statusCache.wifi && statusCache.wifi.connected ? 'Conectado: ' + statusCache.wifi.ssid : 'Não conectado');
-      mk('volume', 'bar', I('M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z'), 'Volume', 'áudio do sistema');
-      mk('brightness', 'bar', I('M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0-5 2.4 3.6H9.6L12 2zm0 20-2.4-3.6h4.8L12 22zM2 12l3.6-2.4v4.8L2 12zm20 0-3.6 2.4V9.6L22 12z'), 'Brilho da tela', 'backlight do LCD');
-      mk('about', 'go', I('M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'), 'Sobre o console', 'versão · hardware · créditos');
-      mk('reboot', 'go', I('M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z'), 'Reiniciar', 'reinicia o console');
-      mk('shutdown', 'go', I('M13 3h-2v10h2V3zm4.8 2.2-1.4 1.4a8 8 0 1 1-9.8 0L5.2 5.2a10 10 0 1 0 12.6 0z'), 'Desligar', 'desliga com segurança');
+      mk('wifi', 'go', 'wifi', 'Wi-Fi', statusCache.wifi && statusCache.wifi.connected ? 'Conectado: ' + esc(statusCache.wifi.ssid) : 'Não conectado');
+      mk('volume', 'bar', 'volume', 'Volume', 'áudio do sistema');
+      mk('brightness', 'bar', 'brightness', 'Brilho da tela', 'backlight do LCD');
+      mk('effects', 'go', 'effects', 'Efeitos CRT', document.documentElement.dataset.effects === 'off' ? 'Desligados · melhor leitura' : 'Ligados · estilo retrô');
+      mk('about', 'go', 'info', 'Sobre o console', 'versão · hardware · créditos');
+      mk('reboot', 'go', 'reboot', 'Reiniciar', 'reinicia o console');
+      mk('shutdown', 'go', 'power', 'Desligar', 'desliga com segurança');
 
       this.setBars();
       return scr;
@@ -438,9 +564,9 @@
     async setBars() {
       const st = await RVBridge.status();
       statusCache.volume = st.volume; statusCache.brightness = st.brightness;
-      Sound.setVolume(st.volume || 70);
-      this.applyBar('volume', st.volume || 0);
-      this.applyBar('brightness', st.brightness || 0);
+      Sound.setVolume(st.volume ?? 70);
+      this.applyBar('volume', st.volume ?? 0);
+      this.applyBar('brightness', st.brightness ?? 0);
     },
     applyBar(id, v) {
       const it = $(`.set-item[data-set="${id}"]`); if (!it) return;
@@ -466,6 +592,13 @@
         if (!focusedEl) return;
         const id = focusedEl.dataset.set;
         if (id === 'wifi') { Sound.open(); pushCtx(wifiScreen); }
+        else if (id === 'effects') {
+          const next = document.documentElement.dataset.effects === 'off' ? 'on' : 'off';
+          document.documentElement.dataset.effects = next; store('rvos:effects', next);
+          $('.sub', focusedEl).textContent = next === 'off' ? 'Desligados · melhor leitura' : 'Ligados · estilo retrô';
+          toast(next === 'off' ? 'Efeitos visuais reduzidos' : 'Efeitos visuais ligados');
+          Sound.confirm();
+        }
         else if (id === 'about') { Sound.open(); pushCtx(aboutScreen); }
         else if (id === 'reboot') openPower('reboot');
         else if (id === 'shutdown') openPower('shutdown');
@@ -481,7 +614,7 @@
     render() {
       const scr = $('#screen');
       scr.innerHTML = '';
-      scr.appendChild(h('div', 'row-title', '<span class="accent">◍</span> Wi-Fi'));
+      scr.appendChild(h('div', 'row-title', `<span class="accent">${icon('wifi')}</span> Wi-Fi`));
       const panel = h('div', 'full-panel');
       const body = h('div', 'ov-body'); body.id = 'wifiBody';
       body.appendChild(h('div', 'back-line', '<b>A</b> conectar · <b>B</b> voltar'));
@@ -497,15 +630,16 @@
         this.nets = (r.networks || []).sort((x, y) => (y.signal || 0) - (x.signal || 0));
       } catch (e) { this.nets = []; toast('Erro ao buscar redes'); Sound.err(); }
       $('.spinner', body) && $('.spinner', body).remove();
+      if (!body.isConnected) return;
       if (!this.nets.length) { body.appendChild(h('div', 'empty-note', 'Nenhuma rede encontrada.')); return; }
       this.nets.forEach(n => {
         const it = h('div', 'net-item focusable' + (n.connected ? ' connected' : ''));
         it.tabIndex = -1; it.dataset.ssid = n.ssid;
         const pct = Math.round((n.signal || 0));
         it.innerHTML = `
-          <svg class="net-sig" viewBox="0 0 24 24" fill="currentColor" opacity="${Math.max(0.25, pct / 100)}"><path d="M12 21l3.5-4.5c-.9-.7-2.1-1.2-3.5-1.2s-2.6.4-3.5 1.2L12 21zm0-18C7.4 3 3.2 4.7 0 7.6l2 2.5C4.6 8 8.1 6.5 12 6.5s7.4 1.5 10 3.6l2-2.5C20.8 4.7 16.6 3 12 3zm0 6c-3 0-5.8 1-8 2.8l2 2.5c1.6-1.2 3.7-2 6-2s4.4.8 6 2l2-2.5C17.8 10 15 9 12 9z"/></svg>
+          <span class="net-sig" style="opacity:${Math.max(0.4, pct / 100)}">${icon('wifi')}</span>
           <div><div class="lbl">${esc(n.ssid)}</div><div class="sub">${n.connected ? 'Conectado' : (n.secure ? 'Protegida' : 'Aberta')}</div></div>
-          <span class="sig">${n.secure ? '<svg class="lock" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 1 1 6 0v3H9z"/></svg>' : ''}${pct}%</span>`;
+          <span class="sig">${n.secure ? icon('lock', 'lock') : ''}${pct}%</span>`;
         body.appendChild(it);
       });
       const first = $('.net-item', body); if (first) setFocus(first, true);
@@ -526,8 +660,9 @@
     async connect(ssid, psk) {
       toast(`Conectando a “${ssid}”…`, 4000);
       try {
-        await RVBridge.wifiConnect(ssid, psk);
-        toast(`Conectado a “${ssid}” ✓`); Sound.confirm();
+        const response = await RVBridge.wifiConnect(ssid, psk);
+        if (response.ok === false) throw new Error('conexão recusada');
+        toast(`Conectado a “${ssid}”`, 2200, 'check'); Sound.confirm();
         statusCache.wifi = { connected: true, ssid: ssid };
         refreshStatus(true);
         this.render();
@@ -544,7 +679,7 @@
       const total = SYS_IDS.reduce((n, id) => n + CAT[id].games.length, 0);
       const scr = $('#screen');
       scr.innerHTML = '';
-      scr.appendChild(h('div', 'row-title', '<span class="accent">ⓘ</span> Sobre o console'));
+      scr.appendChild(h('div', 'row-title', `<span class="accent">${icon('info')}</span> Sobre o console`));
       const panel = h('div', 'full-panel');
       const body = h('div', 'ov-body');
       body.appendChild(h('div', 'back-line', '<b>B</b> voltar'));
@@ -576,7 +711,9 @@
     powerCtx.render(preselect);
   }
   const powerCtx = {
+    confirmAction: null,
     render(preselect) {
+      this.confirmAction = null;
       const ov = $('#overlay'); ov.hidden = false; ov.innerHTML = '';
       const panel = h('div', 'ov-panel');
       panel.appendChild(h('div', 'ov-head', '<h2>Energia</h2><span class="ov-tag">RetroVault OS</span>'));
@@ -584,28 +721,33 @@
       const mk = (act, icon, lbl, sub, danger) => {
         const it = h('div', 'ov-item focusable' + (danger ? ' danger' : ''));
         it.tabIndex = -1; it.dataset.act = act;
-        it.innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="${icon}"/></svg><div><div class="lbl">${lbl}</div><div class="sub">${sub}</div></div>`;
+        it.innerHTML = `${RVIcons.render(icon, 'ic')}<div><div class="lbl">${lbl}</div><div class="sub">${sub}</div></div>`;
         body.appendChild(it);
       };
-      mk('back', 'M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z', 'Continuar jogando', 'voltar para a shell');
-      mk('reboot', 'M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.8-4.2L13 11h7V4l-2.3 2.3z', 'Reiniciar', 'reinicia o console');
-      mk('shutdown', 'M13 3h-2v10h2V3zm4.8 2.2-1.4 1.4a8 8 0 1 1-9.8 0L5.2 5.2a10 10 0 1 0 12.6 0z', 'Desligar', 'desliga com segurança', true);
+      mk('back', 'resume', 'Continuar jogando', 'voltar para a shell');
+      mk('reboot', 'reboot', 'Reiniciar', 'reinicia o console');
+      mk('shutdown', 'power', 'Desligar', 'desliga com segurança', true);
       panel.appendChild(body); ov.appendChild(panel);
       let el = $('.ov-item');
       if (preselect) el = $(`.ov-item[data-act="${preselect}"]`) || el;
       setFocus(el, true);
     },
     onAction(a) {
-      if (['up', 'down'].includes(a)) { const n = nearestIn(a, '#overlay'); if (n) setFocus(n); return; }
+      if (['up', 'down'].includes(a)) { this.confirmAction = null; const n = nearestIn(a, '#overlay'); if (n) setFocus(n); return; }
       if (a === 'b' || a === 'start' || a === 'home') { this.close(); return; }
       if (a === 'a' && focusedEl) {
         const act = focusedEl.dataset.act;
         if (act === 'back') { this.close(); return; }
+        if (this.confirmAction !== act) {
+          this.confirmAction = act;
+          toast(`Aperte A novamente para ${act === 'shutdown' ? 'DESLIGAR' : 'REINICIAR'}` , 3500);
+          Sound.err(); return;
+        }
         this.close(true);
         powerAction(act);
       }
     },
-    close(silent) { $('#overlay').hidden = true; $('#overlay').innerHTML = ''; popCtx(true); if (!silent) Sound.back(); },
+    close(silent) { this.confirmAction = null; $('#overlay').hidden = true; $('#overlay').innerHTML = ''; popCtx(true); if (!silent) Sound.back(); },
   };
   const OS_VERSION = '1.0.0';
 
@@ -615,6 +757,7 @@
     'qwertyuiop',
     'asdfghjkl',
     'zxcvbnm.-',
+    '@_!#$%&*+',
   ];
   const keyboardCtx = {
     title: '', cb: null, secure: false, shift: false, value: '',
@@ -639,17 +782,21 @@
     renderKeys() {
       this.gridEl.innerHTML = '';
       KBD_ROWS.forEach(row => {
+        const line = h('div', 'kbd-row');
         for (const ch of row) {
           const c = this.shift ? ch.toUpperCase() : ch;
           const k = h('div', 'key focusable', esc(c)); k.tabIndex = -1; k.dataset.key = c;
-          this.gridEl.appendChild(k);
+          line.appendChild(k);
         }
+        this.gridEl.appendChild(line);
       });
-      [['shift', this.shift ? '⇧ ABC' : '⇧ abc', 'wide'], ['space', 'espaço', 'wide'], ['back', '⌫ apagar', 'wide'],
-       ['ok', 'conectar ✓', 'wide action']].forEach(([act, lbl, cls]) => {
-        const k = h('div', 'key focusable ' + cls, lbl); k.tabIndex = -1; k.dataset.act = act;
-        this.gridEl.appendChild(k);
+      const actions = h('div', 'kbd-row actions');
+      [['shift', this.shift ? 'ABC' : 'abc', 'wide', 'shift'], ['space', 'espaço', 'wide'], ['back', 'apagar', 'wide', 'backspace'],
+       ['ok', this.secure ? 'conectar' : this.title === 'Buscar jogo' ? 'buscar' : 'concluir', 'wide action', 'check']].forEach(([act, lbl, cls, glyph]) => {
+        const k = h('div', 'key focusable ' + cls, (glyph ? icon(glyph) : '') + `<span>${lbl}</span>`); k.tabIndex = -1; k.dataset.act = act;
+        actions.appendChild(k);
       });
+      this.gridEl.appendChild(actions);
     },
     updateDisplay() {
       const shown = this.secure ? '•'.repeat(this.value.length) : this.value;
@@ -671,7 +818,7 @@
         }
         const act = focusedEl.dataset.act;
         if (act === 'shift') { handleAction('y'); return; }
-        if (act === 'space') { this.value += ' '; this.updateDisplay(); Sound.type(); return; }
+        if (act === 'space') { if (this.value.length >= 63) return Sound.err(); this.value += ' '; this.updateDisplay(); Sound.type(); return; }
         if (act === 'back') { this.value = this.value.slice(0, -1); this.updateDisplay(); Sound.back(); return; }
         if (act === 'ok') {
           const v = this.value, cb = this.cb;
@@ -691,8 +838,15 @@
     void scr.offsetWidth;
     scr.classList.add('screen-in');
   }
+  function updateHints() {
+    const ctx = top();
+    $('[data-h="b"]', $('#hints')).hidden = ctx === homeScreen;
+    $('[data-h="x"]', $('#hints')).hidden = ctx !== consoleScreen && !(ctx === homeScreen && recents.length);
+    $('[data-h="start"]', $('#hints')).hidden = ctx === wizard;
+  }
   function pushCtx(ctx) {
     stack.push(ctx);
+    updateHints();
     if (ctx !== powerCtx && ctx !== keyboardCtx) { ctx.render(); ctx._rendered = true; screenPulse(); }
     if (ctx.defaultFocus) ctx.defaultFocus();
   }
@@ -700,18 +854,20 @@
     if (stack.length <= 1) return;
     stack.pop();
     const ctx = top();
+    updateHints();
     if (ctx && ctx._rendered) { ctx.render(); ctx.defaultFocus(); screenPulse(); }
   }
 
   /* ─────────────────── energia ─────────────────── */
   async function powerAction(kind) {
     const veil = h('div', '', `<div style="text-align:center">
-      <img src="assets/rv-transparent-final-solid.png" style="width:110px;filter:drop-shadow(0 0 24px rgba(139,92,246,.6))">
-      <div style="margin-top:18px;letter-spacing:.2em;text-transform:uppercase;color:#9a92c4">${kind === 'reboot' ? 'Reiniciando…' : 'Desligando…'}</div></div>`);
-    veil.style.cssText = 'position:fixed;inset:0;z-index:200;background:#07060d;display:flex;align-items:center;justify-content:center;';
+      <img src="assets/rv-transparent-final-solid.png" style="width:110px;filter:drop-shadow(0 0 24px rgba(0,255,65,.55))">
+      <div style="margin-top:18px;letter-spacing:.2em;text-transform:uppercase;color:#9fe5b0">${kind === 'reboot' ? 'Reiniciando…' : 'Desligando…'}</div></div>`);
+    veil.style.cssText = 'position:fixed;inset:0;z-index:200;background:#020503;display:flex;align-items:center;justify-content:center;';
     document.body.appendChild(veil);
     try {
       const r = await RVBridge.power(kind);
+      if (r && r.ok === false && r.error !== 'simulated') throw new Error('Falha no comando');
       if (r && r.ok === false && r.error === 'simulated') {
         await new Promise(r2 => setTimeout(r2, 900));
         if (kind === 'reboot') { location.reload(); return; }
@@ -720,8 +876,7 @@
       // no hardware, o sistema desliga de verdade — não há retorno
     } catch (e) {
       await new Promise(r2 => setTimeout(r2, 900));
-      if (kind === 'reboot') { location.reload(); return; }
-      veil.remove(); toast('Não foi possível desligar.');
+      veil.remove(); toast('Não foi possível ' + (kind === 'reboot' ? 'reiniciar' : 'desligar') + '.');
     }
   }
 
@@ -747,8 +902,8 @@
       if (st.battery && st.battery.percent != null) {
         batt.hidden = false;
         $('#sbBattTxt').textContent = st.battery.percent + '%';
-        $('#sbBattFill').setAttribute('height', String(12 * (1 - st.battery.percent / 100) + 0.5));
-        $('#sbBattFill').setAttribute('y', String(6 + 12 * (1 - st.battery.percent / 100)));
+        batt.classList.toggle('low', st.battery.percent <= 20);
+        batt.classList.toggle('charging', !!st.battery.charging);
       } else batt.hidden = true;
     } catch (e) { /* mantém último estado */ }
   }
@@ -770,8 +925,9 @@
   }
 
   async function boot() {
+    document.documentElement.dataset.effects = store('rvos:effects') || 'on';
     const fill = $('#bootFill'), msg = $('#bootMsg');
-    const step = async (pct, m) => { fill.style.width = pct + '%'; msg.textContent = m; await new Promise(r => setTimeout(r, 240)); };
+    const step = async (pct, m) => { fill.style.width = pct + '%'; msg.textContent = m; await new Promise(r => setTimeout(r, 130)); };
 
     await step(15, 'Carregando catálogo…');
     if (!(await ensureCatalog())) {
@@ -833,7 +989,8 @@
       wrap.appendChild(d);
     },
     btn(wrap, label, act, cls) {
-      const b = h('div', 'wiz-btn focusable' + (cls ? ' ' + cls : ''), esc(label));
+      const next = /\s*▶$/.test(label);
+      const b = h('div', 'wiz-btn focusable' + (cls ? ' ' + cls : ''), `<span>${esc(label.replace(/\s*▶$/, ''))}</span>${next ? icon('arrowRight') : ''}`);
       b.tabIndex = -1; b.dataset.act = act;
       wrap.appendChild(b);
       return b;
@@ -853,7 +1010,7 @@
       $('#screen').innerHTML = '';
       Sound.boot();
       pushCtx(homeScreen);
-      if (!skip) setTimeout(() => toast(`Bem-vindo(a), ${this.playerName()}! 🎮`), 700);
+      if (!skip) setTimeout(() => toast(`Bem-vindo(a), ${this.playerName()}!`, 2200, 'gamepad'), 700);
     },
     playerName() { return store('rvos:profile:name') || 'Jogador'; },
 
@@ -948,7 +1105,7 @@
     step_name(wrap) {
       this.header(wrap, 'Como te chamamos?', 'Sem login, sem conta: é só um apelido local do console.');
       wrap.insertAdjacentHTML('beforeend', `<div class="wiz-name" id="wizName">${esc(this.playerName())}</div>`);
-      this.btn(wrap, '✎  Alterar nome', 'edit');
+      const editBtn = this.btn(wrap, 'Alterar nome', 'edit'); editBtn.insertAdjacentHTML('afterbegin', icon('edit'));
       this.btn(wrap, 'Avançar  ▶', 'go', 'primary');
       this.dots(wrap);
       wrap.appendChild(h('div', 'wiz-hint', '<b>A</b> escolher · <b>B</b> voltar'));
@@ -965,7 +1122,7 @@
           <div class="wiz-text">
             Rede: <b>${this.connectedSsid ? esc(this.connectedSsid) : 'offline (ROMs no cartão)'}</b><br>
             Controle: ${this.seenBtns.size ? `<b>${this.seenBtns.size} botões testados</b>` : 'teclado/toque (valide no console)'}<br><br>
-            Dica: dentro de qualquer jogo, segure <b>START + SELECT</b> para voltar à shell.
+            Dica: dentro de qualquer jogo, segure <b>START + SELECT</b> para abrir o menu do jogo.
           </div>
         </div>`);
       this.btn(wrap, 'Entrar no RetroVault  ▶', 'finish', 'primary');
@@ -1007,7 +1164,7 @@
             const r = await RVBridge.wifiConnect(ssid, psk || '');
             if (r && r.ok === false) throw new Error('falhou');
             this.connectedSsid = ssid; statusCache.wifi = { connected: true, ssid };
-            refreshStatus(true); toast(`Conectado ✓`); Sound.confirm();
+            refreshStatus(true); toast('Conectado', 2200, 'check'); Sound.confirm();
           } catch (e) { toast('Falha ao conectar. Verifique a senha.'); Sound.err(); }
           this.render();
         };
@@ -1040,7 +1197,7 @@
         <button class="tp rt" data-a="right">▶</button><button class="tp dn" data-a="down">▼</button>
       </div>
       <div class="tp-act">
-        <button class="tp st" data-a="start">≡</button>
+        <button class="tp st" data-a="start" aria-label="Menu de energia">${icon('menu')}</button>
         <button class="tp b" data-a="b">B</button><button class="tp a" data-a="a">A</button>
       </div>`;
     document.body.appendChild(pad);
@@ -1055,7 +1212,7 @@
   }
 
   /* ─────────────────── arranque ─────────────────── */
-  window.addEventListener('gamepadconnected', () => toast('Controle conectado 🎮'));
+  window.addEventListener('gamepadconnected', () => toast('Controle conectado', 2200, 'gamepad'));
   RVInput.onAction(handleAction);
   setupTouchDev();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

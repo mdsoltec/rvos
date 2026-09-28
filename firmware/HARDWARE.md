@@ -38,15 +38,15 @@ por um pequeno daemon `evdev` (há projetos prontos: `gpioneer`, `analog2joy`).
 | Y (norte)   | 3  | Shift (teclado virtual)  | botão do jogo |
 | L / R       | 4/5 | (paginação futura)      | gatilhos |
 | D-pad       | 12–15 | Navegação             | direção |
-| START       | 9  | Menu de energia          | start |
+| START       | 9  | Menu de energia (ao soltar) | start |
 | SELECT      | 8  | (reservado)              | select |
-| **START+SELECT (segurar 0,8s)** | — | **dentro do jogo: volta à shell** | — |
+| **START+SELECT (segurar 0,8s)** | — | **dentro do jogo: abre menu de save/carregar/sair** | — |
 | HOME/GUIDE  | 16 | Menu de energia          | volta à shell |
 
 Encoders chineses genéricos geralmente não seguem a ordem exata: se A e B
 saírem trocados, o caminho honesto é remapear no próprio encoder ou via
 `udev`/`SDL_GAMECONTROLLERCONFIG` — HARDWARE ainda é a parte artesanal. O combo
-START+SELECT de saída é implementado em `js/rv-console-exit.js` e funciona com
+START+SELECT do menu do jogo é implementado em `js/rv-os-exit.js` e funciona com
 qualquer par de botões 8/9.
 
 ## 2. Tela
