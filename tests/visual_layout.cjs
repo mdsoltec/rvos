@@ -50,6 +50,7 @@ const { chromium } = require('playwright');
       await page.keyboard.press('Escape');
       await page.locator('[data-sys="@settings"]').click();
       await page.locator('[data-set="about"]').click();
+      await page.locator('#aboutBody .about-logo img').evaluate(el => el.decode().catch(() => {}));
       const before = await page.locator('#aboutBody').evaluate(el => el.scrollTop);
       for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');
       const about = await page.locator('#aboutBody').evaluate(el => ({

@@ -70,13 +70,13 @@ set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-  chromium cage curl network-manager wpasupplicant bluez alsa-utils ca-certificates
+  chromium cage curl network-manager wpasupplicant bluez alsa-utils ca-certificates exfatprogs
 systemctl enable bluetooth
 systemctl enable NetworkManager
 # usuário da shell (sem senha de login — device de appliance)
 id rv 2>/dev/null || useradd -m -s /bin/bash rv
 usermod -aG input,video,render,audio,tty rv
-mkdir -p /opt/retrovault /roms
+mkdir -p /opt/retrovault /roms /media/rv
 chown -R rv:rv /roms
 systemctl enable retrovault-bridge.service retrovault-shell.service
 systemctl mask getty@tty1.service
@@ -101,7 +101,7 @@ mkdir -p "$WORK/mnt/root/opt/retrovault/webroot"
 cp -rL "$REPO/webroot/." "$WORK/mnt/root/opt/retrovault/webroot/"
 cp -r "$HERE/rootfs/." "$WORK/mnt/root/"
 ln -sfn /roms "$WORK/mnt/root/opt/retrovault/webroot/roms"
-chmod +x "$WORK/mnt/root/opt/retrovault/kiosk.sh" "$WORK/mnt/root/opt/retrovault/bridge.py"
+chmod +x "$WORK/mnt/root/opt/retrovault/kiosk.sh" "$WORK/mnt/root/opt/retrovault/bridge.py" "$WORK/mnt/root/opt/retrovault/usb-mount.sh"
 chown -R 1000:1000 "$WORK/mnt/root/opt/retrovault" || true
 
 echo ">> executando customize.sh no chroot (baixa pacotes, leva alguns minutos)…"

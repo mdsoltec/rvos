@@ -2,7 +2,8 @@
 
 > O sistema operacional do console portátil RetroVault.
 > **Projeto independente** do [RetroVault WEB](../retrovault) — boot direto na
-> interface, sem login, sem navegador à vista, navegação 100% por botões físicos.
+> interface, sem login na shell e navegável por botões físicos. Sites externos
+> podem exigir conta, teclado e navegador/DRM compatível.
 
 Versão web e OS **não compartilham código em runtime**: este repositório tem
 seu próprio front (fork do player) e sua própria interface. O que vem da web
@@ -17,6 +18,7 @@ retrovault-os/
 │  ├─ icons.css / icons.js     ← ícones SVG compartilhados (sem emojis)
 │  ├─ input.js                 ← Gamepad API + teclado físico → ações
 │  ├─ bridge.js                ← fala com o hardware (ou modo simulação)
+│  ├─ extension/return-home/   ← controle/teclado em sites externos e retorno
 │  ├─ player.html              ← fork do play.html da web (lógica completa:
 │  │                             saves, cheats, BIOS, overlays, EmulatorJS)
 │  ├─ js/, css/                ← ficha dos jogos + lógica do player
@@ -51,6 +53,61 @@ player.html (EmulatorJS local) → START+SELECT: menu do jogo (salvar/carregar/v
 Não há splash/intro de boot na interface web nem gamepad virtual. O visual do
 boot personalizado do aparelho deve ser configurado no **firmware**; ainda não
 foi implementado. O teclado virtual de **texto** permanece para rede, busca e nome.
+
+## Segunda página: entretenimento e utilidades
+
+Na **Home Jogos**, R1 abre **Entretenimento e Utilidades**; nessa segunda Home,
+L1 volta aos jogos. Ombros não alternam telas dentro da biblioteca, Ajustes,
+gerenciador ou diálogos. A segunda página traz **Netflix, YouTube e Spotify**:
+pressionar A navega aos **sites reais** (não são iframes, simulações nem players
+locais). A extensão local `webroot/extension/return-home/` cria, na mesma
+aba, um **cursor pelo analógico/D-pad**, A para clicar, B para voltar no histórico,
+Y para rolar (ou analógico direito), X para abrir o teclado virtual em campos de
+texto e **START+SELECT por 0,8 s** para retornar à Home de apps. No teclado,
+A escolhe, Y alterna maiúsculas, X apaga e B fecha. A extensão não guarda senhas.
+Ela roda no Chromium kiosk e também pode ser instalada temporariamente num
+Chrome/Chromium comum para testar com seu controle físico; veja abaixo.
+
+**Limites:** os cliques e eventos de teclado enviados a sites de terceiros são
+sintéticos. Alguns serviços podem recusá-los, alterar o layout, exigir CAPTCHA
+ou um teclado USB. Internet, conta, Chromium ARM e DRM/Widevine são requisitos
+de reprodução **a validar no Pi 4**. Abrir o site não prova que Netflix/Spotify
+reproduzam mídia nele.
+
+### Testar em um computador com controle físico
+
+1. Extraia o ZIP e, dentro de `rvos/`, execute
+   `python3 -m http.server 8080 --directory webroot` (no Windows, use `python`
+   no lugar de `python3`). Abra **http://127.0.0.1:8080/** no Chrome/Chromium.
+2. Em `chrome://extensions`, habilite **Modo do desenvolvedor** e escolha
+   **Carregar sem compactação** apontando para
+   `rvos/webroot/extension/return-home`. Recarregue a Home após instalá-la.
+3. Conecte o controle ao computador, clique uma vez na página e pressione um
+   botão. Teste **R1 → Netflix em foco → direcional/analógico entre os quatro
+   cards → A para abrir → B para voltar**; L1 retorna aos jogos. No YouTube,
+   teste cursor, busca com teclado na tela e START+SELECT para voltar. O foco
+   dos cards deve aparecer como borda na cor do serviço. Para regressão sem
+   controle físico, `node tests/app_gamepad.cjs` simula o Gamepad API nas duas
+   resoluções de LCD.
+
+Use uma janela/perfil de teste: a extensão pede acesso a sites HTTP/HTTPS para
+continuar funcionando quando um serviço redireciona para sua página de login.
+Ela só ativa o controle na **aba que abriu a shell**; desative/remova a extensão
+ao terminar. A prévia embutida em iframe pode bloquear Gamepad API — neste
+caso, use uma aba própria em `127.0.0.1`, não `file://` nem o visualizador do ZIP.
+O gerenciador real exige a bridge; o servidor estático mostra uma mensagem de
+simulação para arquivos em vez de fingir cópias/exclusões.
+
+O card **Arquivos** abre um gerenciador limitado a `/roms` e aos volumes USB
+montados em `/media/rv/<dispositivo>`. **A** abre pasta, **B** sobe/volta, **X**
+copia um arquivo para a área temporária, **Y** cola na pasta atual (sem
+sobrescrever), **Nova pasta** cria diretórios pelo teclado virtual, **SELECT**
+pede confirmação antes de excluir um arquivo. Pastas
+não podem ser excluídas; links simbólicos não são seguidos nem mostrados. No
+preview servido apenas como estático, Arquivos informa que a bridge é necessária,
+em vez de simular cópias ou exclusões. O firmware monta automaticamente partições
+USB compatíveis em `/media/rv/`; ejetar/remover o pendrive durante cópia pode
+falhar. Em volumes Linux, escrita depende das permissões do filesystem.
 
 ## Diferenças do fork do player vs. web
 

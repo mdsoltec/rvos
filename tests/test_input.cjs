@@ -26,4 +26,14 @@ buttons[8].pressed = buttons[9].pressed = false; tick();
 assert.equal(events.filter(e => e === 'start').length, 1, 'combo não pode emitir START ao soltar');
 keydown({ key: 'p', preventDefault() {} });
 assert.equal(events.at(-1), 'start', 'atalho de teclado mantém compatibilidade');
-console.log('Controle físico: START, SELECT, combo e teclado OK');
+// O analógico deve mover um card por toque, não disparar 60 direções por segundo.
+const start = events.length;
+pad.axes[0] = .9; tick();
+assert.deepEqual(events.slice(start), ['right']);
+for (let i = 0; i < 10; i++) tick(20);
+assert.deepEqual(events.slice(start), ['right'], 'analógico repetiu antes do atraso');
+tick(400);
+assert.deepEqual(events.slice(start), ['right','right'], 'analógico não repete ao segurar');
+pad.axes[0] = 0; tick(); pad.axes[0] = -.9; tick();
+assert.equal(events.at(-1), 'left', 'analógico não reiniciou ao inverter direção');
+console.log('Controle físico: START, SELECT, combo, analógico e teclado OK');

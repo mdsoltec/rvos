@@ -1,0 +1,13 @@
+[Unit]
+Description=RetroVault — montar mídia USB %i
+BindsTo=dev-%i.device
+After=dev-%i.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/retrovault/usb-mount.sh mount %i
+ExecStop=/opt/retrovault/usb-mount.sh umount %i
+
+[Install]
+WantedBy=multi-user.target

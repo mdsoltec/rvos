@@ -100,7 +100,7 @@
 
   function handleAxis(k, dir, now) {
     const prev = axisState[k];
-    if (dir && dir !== prev) { axisState[k] = { dir, t0: now, last: now }; emit(dir); }
+    if (dir && (!prev || dir !== prev.dir)) { axisState[k] = { dir, t0: now, last: now }; emit(dir); }
     else if (dir && prev && now - prev.t0 > REPEAT_DELAY && now - prev.last > REPEAT_RATE) { prev.last = now; emit(dir); }
     else if (!dir) axisState[k] = 0;
   }

@@ -878,3 +878,51 @@ body {
   .avatar-picker-body { padding:5px 9px 8px; }
   .avatar-grid { gap:4px; }
 }
+
+/* Página 02 — serviços: a mesma linguagem do Vault, sem glows cortados. */
+.main-pager { display:flex; align-items:center; gap:9px; font:700 10px Rajdhani, sans-serif; letter-spacing:.16em; color:var(--text-muted); padding:6px 2px 3px; white-space:nowrap; }
+.main-pager .selected { color:var(--green); }
+.pager-line { width:20px; height:1px; background:var(--green); opacity:.42; flex:none; }
+.util-heading { padding:15px 3px 14px; }
+.util-kicker { color:var(--green); font:700 10px Rajdhani,sans-serif; letter-spacing:.24em; }
+.util-heading h2 { margin:3px 0 0; font:700 clamp(26px,5vw,46px) Orbitron,Rajdhani,sans-serif; letter-spacing:-.055em; line-height:1.08; color:var(--text); }
+.util-heading h2 span { color:var(--green); }
+.util-heading p { margin:5px 0 0; color:var(--text-muted); font:600 13px Rajdhani,sans-serif; letter-spacing:.05em; }
+.apps-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; padding:1px 3px 10px; }
+.app-card { --app-color:var(--green); position:relative; display:flex; flex-direction:column; min-width:0; min-height:clamp(136px,41vh,250px); padding:15px; border:1px solid color-mix(in srgb,var(--app-color) 27%,transparent); border-radius:15px; background:linear-gradient(155deg,color-mix(in srgb,var(--app-color) 12%,transparent),transparent 62%),var(--surface,#101b16); color:var(--text); overflow:hidden; cursor:pointer; transition:transform .2s,border-color .2s,background .2s,box-shadow .2s; }
+.app-card::after { content:''; position:absolute; width:55%; height:65%; top:3%; right:-18%; border:1px solid color-mix(in srgb,var(--app-color) 16%,transparent); border-radius:50%; pointer-events:none; }
+.app-card:focus,.app-card.focused { transform:translateY(-3px); border-color:var(--app-color); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--app-color) 35%,transparent),0 8px 26px color-mix(in srgb,var(--app-color) 12%,transparent); outline:none; }
+.app-order { color:var(--app-color); font:700 10px Rajdhani,sans-serif; letter-spacing:.16em; white-space:nowrap; }
+.app-art { display:grid; place-items:center; flex:1; color:var(--app-color); }
+.app-art svg { width:clamp(45px,7vw,74px); height:clamp(45px,7vw,74px); stroke-width:1.15; filter:drop-shadow(0 8px 16px color-mix(in srgb,var(--app-color) 24%,transparent)); }
+.app-copy { display:flex; flex-direction:column; gap:1px; }
+.app-copy strong { font:700 clamp(17px,2.4vw,24px) Rajdhani,sans-serif; letter-spacing:.01em; }
+.app-copy small { font:600 12px Rajdhani,sans-serif; color:var(--text-muted); letter-spacing:.05em; }
+.app-arrow { position:absolute; bottom:17px; right:14px; color:var(--app-color); opacity:.7; }
+.app-arrow svg { width:16px; height:16px; }
+.apps-footnote { padding:0 3px; margin:3px 0 9px; font:600 11px Rajdhani,sans-serif; color:var(--text-muted); }
+@media(max-width:700px) { .util-heading { padding:7px 2px 8px; } .util-heading h2 { font-size:24px; } .util-heading p { font-size:11px; } .apps-grid { gap:7px; } .app-card { min-height:124px; padding:9px; border-radius:10px; } .app-order { font-size:8px; } .app-copy strong { font-size:16px; } .app-copy small { font-size:10px; } .app-art svg { width:41px; height:41px; } .app-arrow { right:8px; bottom:10px; } }
+@media(max-width:440px) { .apps-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .app-card { min-height:82px; display:grid; grid-template-columns:39px 1fr; align-items:center; column-gap:7px; } .app-order { grid-column:1/-1; } .app-art { grid-column:1;grid-row:2; } .app-art svg { width:33px;height:33px; } .app-copy { grid-column:2;grid-row:2; } .app-arrow { display:none; } .main-pager { font-size:8px; } }
+
+.files-heading { padding:12px 3px 9px; }
+.files-heading h2 { color:var(--text); font:700 clamp(20px,3.5vw,31px) Orbitron,Rajdhani,sans-serif; margin:3px 0; }
+.files-heading p { color:var(--text-muted); font:600 12px Rajdhani,sans-serif; margin:0; }
+.files-tabs { display:flex; align-items:stretch; gap:6px; padding:2px 3px 9px; overflow-x:auto; }
+.file-tab { flex:none; display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:8px; border:1px solid var(--line); color:var(--text-dim); background:var(--surface); font:700 12px Rajdhani,sans-serif; cursor:pointer; }
+.file-tab svg { width:15px;height:15px;color:var(--green); }
+.file-tab.active { color:var(--green); border-color:color-mix(in srgb,var(--green) 50%,transparent); background:var(--green-soft); }
+.file-tab.focused,.file-row.focused,.file-confirm-button.focused { border-color:var(--green); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 25%,transparent); background:var(--green-soft); }
+.files-panel { border:1px solid var(--line); background:var(--surface); border-radius:11px; padding:4px 8px; min-height:70px; }
+.files-breadcrumb { display:flex; align-items:center; gap:8px; padding:5px; color:var(--green); font:700 12px Rajdhani,sans-serif; overflow:hidden; white-space:nowrap; }
+.files-breadcrumb svg { width:15px;height:15px;flex:none; }
+.files-breadcrumb span { overflow:hidden;text-overflow:ellipsis; }
+.file-row { display:flex; align-items:center; gap:9px; border:1px solid transparent; border-radius:7px; min-height:31px; padding:3px 8px; cursor:pointer; font:600 13px Rajdhani,sans-serif; color:var(--text-dim); }
+.file-row svg { color:var(--green); width:17px;height:17px;flex:none; }
+.file-row span { flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.file-row small { font-size:10px;color:var(--text-muted);flex:none; }
+.files-notice { padding:12px 7px;color:var(--text-muted);font:600 12px Rajdhani,sans-serif; }
+.files-help { color:var(--text-muted);font:600 11px Rajdhani,sans-serif;padding:9px 4px; }
+.files-confirm { display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px;border-top:1px solid var(--line);color:var(--text);font:600 12px Rajdhani,sans-serif; }
+.files-confirm span { flex:1; }
+.file-confirm-button { border:1px solid var(--line);padding:5px 9px;border-radius:7px;color:var(--text);cursor:pointer; }
+@media(max-width:700px) { .files-heading { padding:5px 3px; } .files-heading h2 { font-size:20px; } .file-row { min-height:26px; } .files-help { padding:5px 4px; } }

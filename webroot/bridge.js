@@ -47,6 +47,9 @@
 
   const Bridge = {
     simulated: true,
+    async filesRoots() { if (!available) throw new Error('Gerenciador disponível no console com bridge'); return req('/api/files/roots'); },
+    async filesList(root, path) { if (!available) throw new Error('Gerenciador disponível no console com bridge'); return req('/api/files/list?root=' + encodeURIComponent(root) + '&path=' + encodeURIComponent(path)); },
+    async filesAction(body) { if (!available) throw new Error('Gerenciador disponível no console com bridge'); return post('/api/files/action', body, 120000); },
 
     async detect() {
       try { await req('/api/status'); available = true; } catch (e) { available = false; }

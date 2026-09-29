@@ -1,5 +1,5 @@
 /* RetroVault OS — cache leve da interface. ROMs, APIs, saves e CDN nunca entram no cache. */
-const CACHE_NAME = 'rvos-shell-v12';
+const CACHE_NAME = 'rvos-shell-v14';
 const SHELL = [
   './', 'index.html', 'player.html', 'fonts.css', 'icons.css', 'shell.css', 'shell.js', 'profile-data.js',
   'theme.js', 'theme.css', 'player-theme.css',

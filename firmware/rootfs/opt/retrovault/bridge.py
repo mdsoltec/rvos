@@ -13,6 +13,7 @@
 #      POST /api/volume          → {value: 0..100}
 #      POST /api/brightness      → {value: 10..100}
 #      POST /api/system          → {action: "shutdown"|"reboot"}
+#      GET  /api/files/roots|list / POST /api/files/action → ROMs e USB apenas
 #
 # O play.html procura ROMs em roms/ — basta um symlink
 #   /opt/retrovault/webroot/roms → /roms (cartão/partição de dados)
@@ -31,8 +32,10 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 import ipaddress
 import shutil
+import stat
+from urllib.parse import parse_qs, unquote
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 START = time.time()
 
 # ───────────────────────── helpers de sistema ─────────────────────────
@@ -322,8 +325,116 @@ def bluetooth_action(address, action):
 # ───────────────────────── servidor HTTP ─────────────────────────
 
 
+# Gerenciador: somente /roms e volumes USB realmente montados pelo sistema.
+# O caminho é atravessado por FDs O_NOFOLLOW (inclusive diretórios intermediários):
+# uma pasta/arquivo symlink em um pendrive nunca alcança o sistema operacional.
+def file_roots():
+    roots = {"roms": "/roms"}
+    base = "/media/rv"
+    if os.path.isdir(base):
+        for name in sorted(os.listdir(base)):
+            path = os.path.join(base, name)
+            if re.fullmatch(r"[a-zA-Z0-9_-]+", name) and os.path.ismount(path):
+                roots["usb:" + name] = path
+    return roots
+
+
+def file_parts(value):
+    if not isinstance(value, str) or len(value) > 1024 or value.startswith("/") or "\\" in value or "\x00" in value:
+        raise ValueError("caminho inválido")
+    parts = value.split("/") if value else []
+    if any(part in ("", ".", "..") for part in parts):
+        raise ValueError("caminho inválido")
+    return parts
+
+
+def file_dir(roots, key, parts):
+    if key not in roots:
+        raise ValueError("unidade não disponível")
+    fd = os.open(roots[key], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in parts:
+            nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = nxt
+        return fd
+    except Exception:
+        os.close(fd)
+        raise
+
+
+def file_list(roots, key, path):
+    fd = file_dir(roots, key, file_parts(path))
+    try:
+        entries = []
+        with os.scandir(fd) as it:
+            for item in it:
+                try:
+                    info = item.stat(follow_symlinks=False)
+                    if stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode):
+                        entries.append({"name": item.name, "directory": stat.S_ISDIR(info.st_mode), "size": info.st_size})
+                except OSError:
+                    pass
+        entries.sort(key=lambda e: (not e["directory"], e["name"].casefold()))
+        return entries[:1000]
+    finally:
+        os.close(fd)
+
+
+def file_mutate(roots, body):
+    action = body.get("action")
+    key, parts = body.get("root"), file_parts(body.get("path"))
+    if action == "mkdir":
+        name = file_parts(body.get("name"))
+        if len(name) != 1:
+            raise ValueError("nome de pasta inválido")
+        parent = file_dir(roots, key, parts)
+        try:
+            os.mkdir(name[0], mode=0o755, dir_fd=parent)
+        finally:
+            os.close(parent)
+        return
+    if not parts:
+        raise ValueError("selecione um arquivo")
+    parent = file_dir(roots, key, parts[:-1])
+    try:
+        if action == "delete":
+            info = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
+            if not stat.S_ISREG(info.st_mode):
+                raise ValueError("somente arquivos podem ser excluídos")
+            os.unlink(parts[-1], dir_fd=parent)
+            return
+        if action != "copy":
+            raise ValueError("ação inválida")
+        dest_parts = file_parts(body.get("destination"))
+        dest = file_dir(roots, body.get("destinationRoot"), dest_parts)
+        try:
+            source = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent)
+            try:
+                if not stat.S_ISREG(os.fstat(source).st_mode):
+                    raise ValueError("somente arquivos podem ser copiados")
+                target = os.open(parts[-1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=dest)
+                try:
+                    with os.fdopen(source, "rb", closefd=False) as src, os.fdopen(target, "wb", closefd=False) as out:
+                        shutil.copyfileobj(src, out, 1024 * 1024)
+                        out.flush()
+                        os.fsync(out.fileno())
+                except Exception:
+                    os.unlink(parts[-1], dir_fd=dest)  # não deixa cópia parcial
+                    raise
+                finally:
+                    os.close(target)
+            finally:
+                os.close(source)
+        finally:
+            os.close(dest)
+    finally:
+        os.close(parent)
+
+
 class Handler(SimpleHTTPRequestHandler):
     root = "/opt/retrovault/webroot"
+    roms_root = "/roms"
     scan_cache = {"t": 0, "nets": None}
     bt_lock = threading.Lock()
 
@@ -353,6 +464,19 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/") and not self._local_request():
             return self._json({"ok": False, "error": "acesso local obrigatório"}, 403)
+        if self.path.startswith("/api/files/"):
+            try:
+                roots = file_roots()
+                if self.path == "/api/files/roots":
+                    return self._json({"ok": True, "roots": [{"id": k, "label": "ROMs" if k == "roms" else "USB · " + k[4:]} for k in roots]})
+                parsed = urlparse(self.path)
+                if parsed.path == "/api/files/list":
+                    query = parse_qs(parsed.query, keep_blank_values=True)
+                    key, path = query.get("root", [""])[0], query.get("path", [""])[0]
+                    return self._json({"ok": True, "entries": file_list(roots, key, path)})
+                return self._json({"ok": False, "error": "rota desconhecida"}, 404)
+            except (OSError, ValueError) as exc:
+                return self._json({"ok": False, "error": str(exc)}, 400)
         if self.path == "/api/status":
             return self._json({
                 "ok": True,
@@ -430,6 +554,14 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("ação ou endereço Bluetooth inválido")
         except (ValueError, TypeError, KeyError):
             return self._json({"ok": False, "error": "parâmetros inválidos"}, 400)
+        if self.path == "/api/files/action":
+            try:
+                file_mutate(file_roots(), body)
+                return self._json({"ok": True})
+            except FileExistsError:
+                return self._json({"ok": False, "error": "Arquivo já existe. Nada foi substituído."}, 409)
+            except (OSError, ValueError) as exc:
+                return self._json({"ok": False, "error": str(exc)}, 400)
         if self.path == "/api/volume":
             ok = set_volume(value)
             return self._json({"ok": ok, "value": get_volume()}, 200 if ok else 500)
@@ -458,6 +590,40 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             return self._json({"ok": False, "error": "ação inválida"}, 400)
         return self._json({"ok": False, "error": "rota desconhecida"}, 404)
+
+    # ---------- estáticos: bloquear symlinks externos e servir ROMs sem segui-los ----------
+    def send_head(self):
+        path = unquote(urlparse(self.path).path)
+        if path == "/roms" or path.startswith("/roms/"):
+            try:
+                parts = file_parts(path[6:])
+                if not parts:
+                    raise ValueError("arquivo inválido")
+                parent = file_dir({"roms": self.roms_root}, "roms", parts[:-1])
+                try:
+                    fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent)
+                finally:
+                    os.close(parent)
+                info = os.fstat(fd)
+                if not stat.S_ISREG(info.st_mode):
+                    os.close(fd)
+                    raise ValueError("arquivo inválido")
+                f = os.fdopen(fd, "rb")
+                self.send_response(200)
+                self.send_header("Content-type", self.guess_type(parts[-1]))
+                self.send_header("Content-Length", str(info.st_size))
+                self.send_header("Last-Modified", self.date_time_string(info.st_mtime))
+                self.end_headers()
+                return f
+            except (OSError, ValueError):
+                self.send_error(404, "ROM não encontrada")
+                return None
+        full = os.path.realpath(super().translate_path(self.path))
+        root = os.path.realpath(self.root)
+        if os.path.commonpath([root, full]) != root:
+            self.send_error(403, "Caminho fora da interface")
+            return None
+        return super().send_head()
 
     # ---------- estáticos: cache amigável + log enxuto ----------
     def end_headers(self):

@@ -23,6 +23,8 @@ exec "$CHROME" \
   --kiosk "$URL" \
   --ozone-platform=wayland \
   --no-sandbox \
+  --load-extension=/opt/retrovault/webroot/extension/return-home \
+  --disable-extensions-except=/opt/retrovault/webroot/extension/return-home \
   --no-first-run --no-default-browser-check \
   --noerrdialogs --disable-infobars --disable-session-crashed-bubble \
   --disable-features=TranslateUI,InterestFeedContentSuggestions \

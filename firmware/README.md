@@ -70,6 +70,37 @@ que exigem digitar/confirmar PIN ou passkey podem falhar. Parear fones não
 configura perfil de áudio nem saída sonora. A interface de testes sem bridge
 mostra rede/controle/fone **simulados**, não um teste do rádio do Raspberry Pi.
 
+## Apps externos e arquivos USB
+
+A shell oferece R1 da Home Jogos para Netflix, YouTube, Spotify e Arquivos;
+L1 retorna só entre as duas Homes. Os três sites abrem diretamente no Chromium.
+No kiosk, a extensão `webroot/extension/return-home` é carregada com
+`--load-extension`/`--disable-extensions-except`. Ao sair da shell ela oferece
+analógico/D-pad como cursor, A para clicar, B para voltar no histórico, Y/analógico
+direito para rolar, X para teclado virtual (A escolhe, Y maiúsculas, X apaga,
+B fecha), START+SELECT por ~0,8 s para retornar. A URL da Home é aprendida na
+mesma aba: funciona também em `127.0.0.1:8080` no computador (instruções no
+README principal). Não salva credenciais. Os eventos enviados por uma extensão
+podem ser rejeitados por serviços específicos; teclado USB pode ser necessário
+em logins especiais/CAPTCHA. Validar no **Pi 4 real** instalação/carregamento da
+extensão, controle e reprodução: Chromium ARM pode não oferecer Widevine/DRM
+para Netflix/Spotify. Site aberto ≠ conteúdo protegido reproduzindo.
+
+Ao inserir pendrives, a regra udev aciona `retrovault-usb@.service` e
+`usb-mount.sh` para montar somente partições USB com filesystem reconhecido em
+`/media/rv/<nome-do-bloco>` (VFAT, exFAT, ext2/3/4 e NTFS se suportado pelo
+kernel). O gerenciador lista somente essas montagens e `/roms`. Para copiar um
+jogo do USB, abra o pendrive, selecione o arquivo e aperte X; vá a
+ROMs/<console> e aperte Y. Crie a pasta do console com **Nova pasta** se ainda
+não existir. Não sobrescreve arquivos existentes. SELECT exclui somente arquivos
+e exige confirmação. O nome do arquivo no destino precisa
+corresponder ao catálogo. A API `/api/files/*` só responde a clientes locais;
+componentes de caminho `.`/`..`, diretórios symlink e arquivos symlink são
+bloqueados via descritores de arquivo sem seguir links. O servidor da bridge
+continua executando como root para funções existentes; não exponha a porta
+localmente via proxy reverso. A montagem e a gravação em hardware ainda precisam
+ser validadas com um pendrive real.
+
 ## ROMs no cartão
 
 O `player.html` procura a ROM **primeiro** em `roms/<console>/<arquivo>` antes de

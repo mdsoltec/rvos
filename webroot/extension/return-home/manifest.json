@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "RetroVault — controle nos sites",
+  "version": "1.1.0",
+  "description": "Cursor, teclado na tela e retorno pelo controle em sites externos abertos pelo RetroVault OS.",
+  "permissions": ["storage"],
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["return.js"],
+    "css": ["return.css"],
+    "run_at": "document_idle",
+    "all_frames": false
+  }]
+}

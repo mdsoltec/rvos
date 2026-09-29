@@ -302,7 +302,16 @@
 
   function handleAction(a) {
     const ctx = top();
+    // Ombros pertencem somente às duas páginas raiz. Repetição ao segurar
+    // não provoca pingue-pongue: R1 só age em Jogos, L1 só age em Apps.
+    if (a === 'r' && ctx === homeScreen) { switchMain(utilitiesScreen); return; }
+    if (a === 'l' && ctx === utilitiesScreen) { switchMain(homeScreen); return; }
     if (ctx && ctx.onAction) ctx.onAction(a);
+  }
+  function switchMain(page) {
+    stack[0] = page;
+    sessionStorage.setItem('rvos:main', page === utilitiesScreen ? 'utilities' : 'games');
+    updateHints(); page.render(); page._rendered = true; page.defaultFocus(); $('#screen').scrollTop = 0; screenPulse();
   }
 
   /* ════════════════════ HOME — consoles full-bleed ════════════════════ */
@@ -348,6 +357,7 @@
     render() {
       const scr = $('#screen');
       scr.innerHTML = '';
+      scr.appendChild(mainPager('games'));
       ambient(null); // home = verde da marca
 
       // ── Continuar jogando (hero) ──
@@ -421,6 +431,163 @@
     },
     _rendered: false,
   };
+
+  const STREAMS = {
+    netflix: { label: 'Netflix', url: 'https://www.netflix.com/browse', icon: 'film', detail: 'Filmes e séries', color: '#e84d57' },
+    youtube: { label: 'YouTube', url: 'https://www.youtube.com/', icon: 'video', detail: 'Vídeos e canais', color: '#ff5757' },
+    spotify: { label: 'Spotify', url: 'https://open.spotify.com/', icon: 'music', detail: 'Música e podcasts', color: '#4de3a0' },
+  };
+  function mainPager(active) {
+    return h('div', 'main-pager', `<span class="${active === 'games' ? 'selected' : ''}">01 &nbsp; JOGOS</span><span class="pager-line"></span><span class="${active === 'utilities' ? 'selected' : ''}">02 &nbsp; ENTRETENIMENTO E UTILIDADES</span>`);
+  }
+  const utilitiesScreen = {
+    render() {
+      const scr = $('#screen'); scr.innerHTML = ''; ambient(null);
+      scr.appendChild(mainPager('utilities'));
+      scr.appendChild(h('div', 'util-heading', '<span class="util-kicker">SEGUNDA PÁGINA · 02 / 02</span><h2>Mais que jogos<span>.</span></h2><p>Seus serviços e seus arquivos, em um só lugar.</p>'));
+      const grid = h('div', 'apps-grid');
+      Object.entries(STREAMS).forEach(([id, app], i) => {
+        const card = h('div', 'app-card focusable', `<span class="app-order">0${i + 1} / STREAMING</span><span class="app-art">${icon(app.icon)}</span><span class="app-copy"><strong>${esc(app.label)}</strong><small>${esc(app.detail)}</small></span><span class="app-arrow">${icon('external')}</span>`);
+        card.tabIndex = -1; card.dataset.app = id; card.style.setProperty('--app-color', app.color); grid.appendChild(card);
+      });
+      const files = h('div', 'app-card focusable app-files', `<span class="app-order">04 / UTILIDADE</span><span class="app-art">${icon('folder')}</span><span class="app-copy"><strong>Arquivos</strong><small>ROMs e mídia USB</small></span><span class="app-arrow">${icon('external')}</span>`);
+      files.tabIndex = -1; files.dataset.app = 'files'; grid.appendChild(files); scr.appendChild(grid);
+      scr.appendChild(h('p', 'apps-footnote', 'Streaming requer internet e conta. Reprodução depende do navegador e de DRM no aparelho.'));
+    },
+    onAction(a) {
+      if (a === 'start' || a === 'home') return openPower();
+      if (['left','right','up','down'].includes(a)) { const next = nearestIn(a, $('#screen')); if (next) setFocus(next); return; }
+      if (a !== 'a' || !focusedEl) return;
+      const id = focusedEl.dataset.app;
+      if (id === 'files') { Sound.open(); pushCtx(filesScreen); filesScreen.reload(true); return; }
+      if (!STREAMS[id]) return;
+      Sound.confirm();
+      // A extensão kiosk injeta retorno por START+SELECT também nas páginas HTTPS.
+      sessionStorage.setItem('rvos:main', 'utilities');
+      location.assign(STREAMS[id].url);
+    },
+    defaultFocus() { setFocus($('.app-card', $('#screen')), true); },
+  };
+
+  /* Arquivos — apenas raízes autorizadas da bridge; sem diretórios do SO. */
+  const filesScreen = {
+    roots: [], root: 'roms', path: '', entries: [], clipboard: null, pending: null, error: '',
+    render() {
+      const scr = $('#screen'); scr.innerHTML = ''; ambient(null);
+      scr.appendChild(h('div', 'files-heading', `<span class="util-kicker">UTILIDADE · ARQUIVOS</span><h2>Gerenciador de arquivos</h2><p>Somente ROMs e pendrives USB conectados. Nenhuma pasta do sistema é exibida.</p>`));
+      const tabs = h('div', 'files-tabs');
+      this.roots.forEach(root => {
+        const tab = h('div', 'file-tab focusable' + (root.id === this.root ? ' active' : ''), `${icon(root.id === 'roms' ? 'folder' : 'external')}<span>${esc(root.label)}</span>`);
+        tab.tabIndex = -1; tab.dataset.fileRoot = root.id; tabs.appendChild(tab);
+      });
+      const newFolder = h('div', 'file-tab focusable', `${icon('folder')}<span>Nova pasta</span>`);
+      newFolder.tabIndex = -1; newFolder.dataset.fileNew = '1'; tabs.appendChild(newFolder);
+      const refresh = h('div', 'file-tab focusable', `${icon('refresh')}<span>Atualizar</span>`);
+      refresh.tabIndex = -1; refresh.dataset.fileRefresh = '1'; tabs.appendChild(refresh);
+      scr.appendChild(tabs);
+      const body = h('div', 'files-panel');
+      body.appendChild(h('div', 'files-breadcrumb', `${icon('folder')}<span>${esc(this.roots.find(r => r.id === this.root)?.label || 'ROMs')} / ${esc(this.path || 'início')}</span>`));
+      if (this.path) {
+        const up = h('div', 'file-row focusable', `${icon('folder')}<span>..</span><small>Pasta anterior</small>`);
+        up.tabIndex = -1; up.dataset.fileUp = '1'; body.appendChild(up);
+      }
+      this.entries.forEach((e, i) => {
+        const row = h('div', 'file-row focusable', `${icon(e.directory ? 'folder' : 'file')}<span>${esc(e.name)}</span><small>${e.directory ? 'PASTA' : formatFileSize(e.size)}</small>`);
+        row.tabIndex = -1; row.dataset.fileIndex = String(i); body.appendChild(row);
+      });
+      if (this.error) body.appendChild(h('div', 'files-notice', esc(this.error)));
+      else if (!this.entries.length) body.appendChild(h('div', 'files-notice', RVBridge.simulated ? 'Modo simulação: abra com a bridge para ver ROMs e USB.' : 'Nenhum arquivo nesta pasta.'));
+      if (this.pending) {
+        const confirm = h('div', 'files-confirm', `<span>Excluir <b>${esc(this.pending.name)}</b>? Não é possível desfazer.</span>`);
+        const yes = h('div', 'file-confirm-button focusable', 'Excluir arquivo'); yes.tabIndex = -1; yes.dataset.fileConfirm = '1'; confirm.appendChild(yes);
+        const no = h('div', 'file-confirm-button focusable', 'Cancelar'); no.tabIndex = -1; no.dataset.fileCancel = '1'; confirm.appendChild(no);
+        body.appendChild(confirm);
+      }
+      scr.appendChild(body);
+      scr.appendChild(h('div', 'files-help', `A abrir pasta · X copiar arquivo · Y colar na pasta atual · SELECT excluir · B voltar${this.clipboard ? ` <br>Na área de transferência: ${esc(this.clipboard.path.split('/').pop())}` : ''}`));
+    },
+    async reload(roots) {
+      const ticket = this.loadTicket = (this.loadTicket || 0) + 1;
+      try {
+        this.error = '';
+        if (roots) {
+          const res = await RVBridge.filesRoots();
+          if (ticket !== this.loadTicket) return;
+          this.roots = res.roots;
+          if (!this.roots.some(x => x.id === this.root)) { this.root = 'roms'; this.path = ''; }
+        }
+        const res = await RVBridge.filesList(this.root, this.path);
+        if (ticket !== this.loadTicket) return;
+        this.entries = res.entries;
+      } catch (e) { if (ticket !== this.loadTicket) return; this.entries = []; this.error = e.message; }
+      if (top() !== this) return;
+      this.render(); this.defaultFocus();
+    },
+    onAction(a) {
+      if (a === 'b') {
+        if (this.pending) { this.pending = null; this.render(); this.defaultFocus(); }
+        else if (this.path) { this.path = this.path.split('/').slice(0, -1).join('/'); this.reload(false); }
+        else popCtx();
+        return;
+      }
+      if (a === 'start' || a === 'home') return openPower();
+      if (['left','right','up','down'].includes(a)) { const next = nearestIn(a, $('#screen')); if (next) setFocus(next); return; }
+      if (a === 'x' && !this.pending && focusedEl?.dataset.fileIndex != null) {
+        const e = this.entries[Number(focusedEl.dataset.fileIndex)];
+        if (e && !e.directory) { this.clipboard = { root: this.root, path: [this.path,e.name].filter(Boolean).join('/') }; toast('Arquivo copiado. Abra a pasta destino e aperte Y.', 3200, 'file'); Sound.confirm(); }
+        return;
+      }
+      if (a === 'y' && !this.pending && this.clipboard) {
+        const source = this.clipboard;
+        this.busy(async () => {
+          await RVBridge.filesAction({ action: 'copy', root: source.root, path: source.path, destinationRoot: this.root, destination: this.path });
+          toast('Arquivo copiado para a pasta atual.', 2500, 'check'); await this.reload(false);
+        }); return;
+      }
+      if (a === 'select' && !this.pending && focusedEl?.dataset.fileIndex != null) {
+        const e = this.entries[Number(focusedEl.dataset.fileIndex)];
+        if (e && !e.directory) { this.pending = { name: e.name, root: this.root, path: [this.path,e.name].filter(Boolean).join('/') }; this.render(); setFocus($('[data-file-confirm]', $('#screen')), true); }
+        return;
+      }
+      if (a !== 'a' || !focusedEl) return;
+      if (focusedEl.dataset.fileCancel) { this.pending = null; this.render(); this.defaultFocus(); return; }
+      if (focusedEl.dataset.fileConfirm && this.pending) {
+        const pending = this.pending; this.pending = null;
+        this.busy(async () => {
+          await RVBridge.filesAction({ action: 'delete', root: pending.root, path: pending.path });
+          toast('Arquivo excluído.', 2400); await this.reload(false);
+        }); return;
+      }
+      if (this.pending) return;
+      if (focusedEl.dataset.fileNew) {
+        pushKeyboard('Nome da nova pasta', name => {
+          name = name.trim();
+          if (!name || name === '.' || name === '..' || /[\\/\\\\]/.test(name)) { toast('Nome de pasta inválido', 3000); return; }
+          this.busy(async () => {
+            await RVBridge.filesAction({ action: 'mkdir', root: this.root, path: this.path, name });
+            toast('Pasta criada: ' + name, 2400, 'folder'); await this.reload(false);
+          });
+        }, false);
+        return;
+      }
+      if (focusedEl.dataset.fileRefresh) { this.reload(true); return; }
+      if (focusedEl.dataset.fileRoot) { this.root = focusedEl.dataset.fileRoot; this.path = ''; this.reload(false); return; }
+      if (focusedEl.dataset.fileUp) { this.path = this.path.split('/').slice(0,-1).join('/'); this.reload(false); return; }
+      if (focusedEl.dataset.fileIndex != null) {
+        const e = this.entries[Number(focusedEl.dataset.fileIndex)];
+        if (e?.directory) { this.path = [this.path,e.name].filter(Boolean).join('/'); this.reload(false); }
+        else toast('X copia · SELECT exclui · B volta', 2500);
+      }
+    },
+    async busy(fn) {
+      if (this.working) return;
+      this.working = true;
+      try { await fn(); } catch (e) { toast(e.message || 'Falha ao acessar arquivo', 4200); Sound.err(); }
+      finally { this.working = false; }
+    },
+    defaultFocus() { setFocus($('.file-row', $('#screen')) || $('.file-tab', $('#screen')), true); },
+  };
+  function formatFileSize(size) { return size < 1024 ? size + ' B' : size < 1048576 ? Math.round(size / 1024) + ' KB' : (size / 1048576).toFixed(1) + ' MB'; }
 
   function openSettings() { Sound.open(); pushCtx(settingsScreen); }
 
@@ -1295,13 +1462,17 @@
   }
   function updateHints() {
     const ctx = top();
-    $('[data-h="b"]', $('#hints')).hidden = ctx === homeScreen;
+    $('[data-h="b"]', $('#hints')).hidden = ctx === homeScreen || ctx === utilitiesScreen;
     const xHint = $('[data-h="x"]', $('#hints'));
     xHint.hidden = ctx !== bluetoothScreen && ctx !== consoleScreen && ctx !== gameDetailScreen && !(ctx === homeScreen && recents.length);
-    $('em', xHint).textContent = ctx === bluetoothScreen ? 'Esquecer' : 'Favorito';
-    $('[data-h="y"]', $('#hints')).hidden = ctx !== consoleScreen;
-    $('[data-h="select"]', $('#hints')).hidden = ctx !== consoleScreen && ctx !== gameDetailScreen;
-    $('em', $('[data-h="a"]', $('#hints'))).textContent = ctx === consoleScreen ? 'Jogar' : ctx === gameDetailScreen ? 'Escolher' : 'Confirmar';
+    $('em', xHint).textContent = ctx === filesScreen ? 'Copiar' : ctx === bluetoothScreen ? 'Esquecer' : 'Favorito';
+    $('[data-h="y"]', $('#hints')).hidden = ctx !== consoleScreen && ctx !== filesScreen;
+    $('em', $('[data-h="y"]', $('#hints'))).textContent = ctx === filesScreen ? 'Colar' : 'Ficha';
+    $('[data-h="l"]', $('#hints')).hidden = ctx !== utilitiesScreen;
+    $('[data-h="r"]', $('#hints')).hidden = ctx !== homeScreen;
+    $('[data-h="select"]', $('#hints')).hidden = ctx !== consoleScreen && ctx !== gameDetailScreen && ctx !== filesScreen;
+    $('em', $('[data-h="select"]', $('#hints'))).textContent = ctx === filesScreen ? 'Excluir' : 'Status';
+    $('em', $('[data-h="a"]', $('#hints'))).textContent = ctx === consoleScreen ? 'Jogar' : ctx === gameDetailScreen ? 'Escolher' : (ctx === filesScreen || ctx === utilitiesScreen) ? 'Abrir' : 'Confirmar';
     $('[data-h="start"]', $('#hints')).hidden = ctx === wizard || (window.innerWidth <= 520 && (ctx === consoleScreen || ctx === gameDetailScreen));
   }
   function pushCtx(ctx) {
@@ -1402,7 +1573,7 @@
     await RVBridge.detect();
     $('#sbSim').hidden = !RVBridge.simulated;
     $('#app').hidden = false;
-    pushCtx(store('rvos:setup:done') ? homeScreen : wizard);
+    pushCtx(store('rvos:setup:done') ? (sessionStorage.getItem('rvos:main') === 'utilities' ? utilitiesScreen : homeScreen) : wizard);
     tickClock(); setInterval(tickClock, 10000);
     refreshPlayerName();
     refreshStatus(true); setInterval(refreshStatus, 20000);
