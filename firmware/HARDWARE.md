@@ -73,6 +73,24 @@ luxuoso. Ajuste fino de brilho sai pela **Ajustes → Brilho** (`/sys/class/back
 - Melhor: **DAC I2S** (PCM5102, MAX98357A com amp): overlay `dtoverlay=hifiberry-dac`
   e pronto — o controle de volume da shell já fala com o ALSA.
 
+## 4.1 Redes e Bluetooth
+
+- **Wi-Fi:** exige adaptador reconhecido pelo Linux, rádio ligado e NetworkManager
+  ativo. A shell usa a bridge local para buscar, mostrar sinal e conectar pelo
+  `nmcli`; a senha não volta na resposta da API. O assistente permite seguir
+  offline. Teste com redes abertas e WPA/WPA2 reais no aparelho.
+- **Bluetooth:** exige adaptador reconhecido, `bluetooth.service` ativo e rádio
+  ligado. O build instala `bluez`. Ajustes → Bluetooth lista, busca, pareia,
+  conecta, desconecta e esquece via bridge/`bluetoothctl`. O controle antigo
+  deve permanecer disponível enquanto o novo é pareado. O agente
+  `NoInputNoOutput` serve a dispositivos compatíveis com *Just Works*; alguns
+  controles pedem confirmação ou PIN e precisarão de outro fluxo de agente.
+  Teste a navegação Gamepad API do Chromium com o controle efetivamente pareado.
+- **Fones Bluetooth:** conectar não seleciona perfil nem roteia áudio
+  automaticamente; ALSA/PipeWire exigem configuração própria para isso.
+- **Sem rádio:** a bridge avisa indisponibilidade. Só o site estático, sem bridge,
+  usa dispositivos de exemplo marcados como **SIMULAÇÃO**.
+
 ## 5. Carcaça de referência (caminho comum)
 
 1. **Protótipo**: Raspberry Pi Zero 2 W + tela 4.3" HDMI 800×480 + encoder USB

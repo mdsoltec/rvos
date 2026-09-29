@@ -1,12 +1,14 @@
 /* RetroVault OS — cache leve da interface. ROMs, APIs, saves e CDN nunca entram no cache. */
-const CACHE_NAME = 'rvos-shell-v2';
+const CACHE_NAME = 'rvos-shell-v12';
 const SHELL = [
-  './', 'index.html', 'player.html', 'fonts.css', 'icons.css', 'shell.css', 'shell.js',
-  'bridge.js', 'input.js', 'icons.js', 'ui/system-gear.png', 'js/catalog.js', 'js/rv-os-exit.js',
+  './', 'index.html', 'player.html', 'fonts.css', 'icons.css', 'shell.css', 'shell.js', 'profile-data.js',
+  'theme.js', 'theme.css', 'player-theme.css',
+  'bridge.js', 'input.js', 'icons.js', 'ui/system-gear.png', 'js/catalog.js', 'js/fichas.js', 'js/rv-os-exit.js',
   'js/rv-config.js', 'js/rv-account.js', 'js/rv-input-mode.js',
   'js/audio.js', 'js/overlay-parser.js', 'js/rv-extras.js',
   'fonts/rajdhani-400.woff2', 'fonts/rajdhani-600.woff2',
-  'fonts/rajdhani-700.woff2', 'fonts/orbitron-700.woff2'
+  'fonts/rajdhani-700.woff2', 'fonts/orbitron-700.woff2',
+  ...Array.from({ length: 20 }, (_, i) => `assets/avatar-${String(i + 1).padStart(2, '0')}.png`)
 ];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => Promise.all(

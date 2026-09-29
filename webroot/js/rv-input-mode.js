@@ -93,6 +93,9 @@
   function hasGamepad() { gamepadSeen = scanGamepads(); return gamepadSeen; }
 
   function shouldShowVirtualPad() {
+    // O player do RetroVault OS usa exclusivamente controle físico. Nem a
+    // preferência herdada do site (?pad=on) reativa botões virtuais aqui.
+    if (/[?&]os=1(?:&|$)/.test(global.location.search || '')) return false;
     var m = mode();
     if (m === 'on') return true;
     if (m === 'off') return false;

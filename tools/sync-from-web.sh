@@ -18,6 +18,7 @@ DEV=0
 [ "${1:-}" = "--dev" ] && DEV=1
 
 [ -f "$WEB_SRC/js/catalog.js" ] || { echo "✖ não achei o catálogo em $WEB_SRC (defina RETROVAULT_WEB)"; exit 1; }
+[ -f "$WEB_SRC/js/fichas.js" ] || { echo "✖ não achei as fichas em $WEB_SRC/js/fichas.js"; exit 1; }
 echo ">> fonte: $WEB_SRC"
 
 link_or_copy() { # link_or_copy <origem> <destino>
@@ -34,6 +35,7 @@ link_or_copy "$WEB_SRC/covers"   "$ROOT/webroot/covers"
 link_or_copy "$WEB_SRC/assets"   "$ROOT/webroot/assets"
 link_or_copy "$WEB_SRC/cheats"   "$ROOT/webroot/cheats"
 link_or_copy "$WEB_SRC/js/catalog.js" "$ROOT/webroot/js/catalog.js"
+link_or_copy "$WEB_SRC/js/fichas.js"  "$ROOT/webroot/js/fichas.js"
 
 # overlays (controles virtuais de toque) NÃO entram no console: 92 MB e
 # servem só para celular. Se quiser mesmo assim: --overlays

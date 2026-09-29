@@ -6,9 +6,10 @@
   <link rel="icon" type="image/png" href="assets/rv-icon.png">
   <link rel="apple-touch-icon" href="assets/rv-icon.png">
   <link rel="manifest" href="manifest.json">
+  <script src="theme.js?v=1"></script>
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="icons.css?v=8">
-  <script src="icons.js?v=8"></script>
+  <script src="icons.js?v=9"></script>
   <title>RetroVault OS</title>
   <!-- Defesa: o EmulatorJS consulta MediaRecorder.isTypeSupported SEM checar
        se a API existe. Em navegadores sem MediaRecorder (WebKit/Safari antigo,
@@ -28,7 +29,7 @@
        RVStore separa os dados por usuário (rv:<uid>:chave). -->
   <script src="js/rv-config.js?v=6"></script>
   <script src="js/rv-account.js?v=50260922"></script>
-  <script src="js/rv-input-mode.js?v=50260922"></script>
+  <script src="js/rv-input-mode.js?v=50260923"></script>
   <script>RVAccount.guard();</script>
   <script src="js/audio.js?v=50260922"></script>
   <script src="js/overlay-parser.js?v=50260922"></script>
@@ -93,12 +94,6 @@
       mask-image: radial-gradient(ellipse at 50% 45%, black 25%, transparent 72%);
       -webkit-mask-image: radial-gradient(ellipse at 50% 45%, black 25%, transparent 72%);
     }
-    .rv-bg::after {
-      content: ''; position: absolute; inset: 0;
-      background-image: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.16) 3px,rgba(0,0,0,.16) 4px);
-      animation: scanPulse 4s linear infinite;
-    }
-    @keyframes scanPulse { 0%,100%{opacity:.5} 50%{opacity:1} }
     .rv-load-ring {
       position: relative; z-index: 1;
       width: 132px; height: 132px;
@@ -328,7 +323,9 @@
     /* Aparelho sem necessidade de controle na tela (PC, ou gamepad
        conectado): nada de overlay, nem por engano. */
     body.rv-no-virtualpad #rv-overlay,
-    body.rv-no-virtualpad #rv-pad { display: none !important; }
+    body.rv-no-virtualpad #rv-pad,
+    body.rv-os-player #rv-overlay,
+    body.rv-os-player #rv-pad { display: none !important; pointer-events: none !important; }
 
     #rv-overlay {
       position: fixed;
@@ -610,12 +607,6 @@
       box-shadow: 0 0 0 6px rgba(2,8,4,.85), 0 10px 34px rgba(0,0,0,.55);
       border-radius: 4px;
     }
-    body.rv-bezel-crt #game {
-      outline: 5px solid #0c110d;
-      outline-offset: 7px;
-      box-shadow: 0 0 0 14px #060a07, 0 0 0 16px rgba(0,255,65,.12), 0 18px 60px rgba(0,0,0,.7);
-      border-radius: 10px;
-    }
     body.rv-bezel-auto #game {
       outline: 3px solid var(--rv-bezel-c, #00ff41);
       outline-offset: 4px;
@@ -692,6 +683,8 @@
     #rv-sys-bar .rv-sys-sram-row button:hover { background: rgba(142, 240, 255, .18); }
 
 </style>
+<link rel="stylesheet" href="theme.css?v=1">
+<link rel="stylesheet" href="player-theme.css?v=1">
 </head>
 <body class="rv-no-virtualpad">
 
@@ -810,6 +803,8 @@
 
 <script>
 const params = new URLSearchParams(window.location.search);
+const rvOsPlayer = params.get('os') === '1';
+if (rvOsPlayer) document.body.classList.add('rv-os-player');
 let core = params.get('core') || 'snes';
 // Garante que 'game' não carregue query string embutida (ex: "...nes?debug=1")
 // — remove qualquer '?' que apareça DENTRO do valor do game.
@@ -1293,7 +1288,9 @@ if (isNDSCore) {
      cores pesados (N64, PSX, Sega CD, NDS) para não afetar o desempenho. */
 EJS_language = 'pt-BR';
 EJS_volume = 0.7;
-EJS_color = (CONSOLE_THEMES[core] || { color: '#00ff41' }).color;
+EJS_color = rvOsPlayer
+  ? getComputedStyle(document.documentElement).getPropertyValue('--green').trim()
+  : (CONSOLE_THEMES[core] || { color: '#00ff41' }).color;
 const RV_REWIND_OK = ['snes', 'nes', 'gb', 'gbc', 'gba', 'segaMD', 'segaMS',
                       'segaGG', 'atari2600'].includes(core);
 if (isNDSCore) {
@@ -2392,12 +2389,13 @@ try {
     EJS_defaultOptions['save-state-location'] = rvCfg.saveLocation;
   if (typeof rvCfg.saveSlot === 'number' && rvCfg.saveSlot >= 1 && rvCfg.saveSlot <= 9)
     EJS_defaultOptions['save-state-slot'] = String(rvCfg.saveSlot);
-  if (typeof rvCfg.shader === 'string' && rvCfg.shader)
+  // Não reaplica filtros CRT/scanlines que tenham sido salvos anteriormente.
+  if (typeof rvCfg.shader === 'string' && rvCfg.shader && !/(?:crt|scan.?line)/i.test(rvCfg.shader))
     EJS_defaultOptions.shader = rvCfg.shader;
   if (rvCfg.vsync === true || rvCfg.vsync === false)
     EJS_defaultOptions.vsync = rvCfg.vsync ? 'enabled' : 'disabled';
   /* ── Extras (moldura, clipe, tempo, portão dos pais) ── */
-  if (typeof rvCfg.bezel === 'string' && ['auto', 'slim', 'crt'].indexOf(rvCfg.bezel) >= 0) {
+  if (typeof rvCfg.bezel === 'string' && ['auto', 'slim'].indexOf(rvCfg.bezel) >= 0) {
     document.body.classList.add('rv-bezel-' + rvCfg.bezel);
     if (rvCfg.bezel === 'auto' && typeof CONSOLE_THEMES === 'object' && CONSOLE_THEMES[core]) {
       document.body.style.setProperty('--rv-bezel-c', CONSOLE_THEMES[core].color);
@@ -2688,7 +2686,7 @@ if (isArcade) {
     startRvEmulator();
   }).catch(() => {
     document.getElementById('rv-msg').textContent = 'ROM indisponível no servidor — o arquivo não foi encontrado. Volte e escolha outro jogo; os demais devem funcionar.';
-    document.getElementById('rv-msg').style.color = '#ff7777';
+    document.getElementById('rv-msg').style.color = 'var(--bad, #ff7777)';
     initControls(); // Mostra overlay mesmo em erro/teste sem ROM
   });
 }
@@ -2788,7 +2786,7 @@ async function initControls(force = false) {
     // PC com mouse/teclado ou QUALQUER aparelho com gamepad conectado
     // não recebe overlay nenhum: a tela fica limpa e o jogo usa o
     // controle físico (o EmulatorJS já trata gamepad nativamente).
-    if (window.RVInput && !RVInput.shouldShowVirtualPad()) {
+    if (rvOsPlayer || (window.RVInput && !RVInput.shouldShowVirtualPad())) {
       teardownControls();
       document.body.classList.add('rv-no-virtualpad');
       return;
@@ -3379,7 +3377,7 @@ document.getElementById('rv-fs-btn').addEventListener('touchend',e=>{e.preventDe
 
 /* Resize/orientation — só reconstrói se o aparelho realmente usa controle na tela */
 function rvNeedsVirtualPad() {
-  return window.RVInput ? RVInput.shouldShowVirtualPad() : isTouch;
+  return !rvOsPlayer && (window.RVInput ? RVInput.shouldShowVirtualPad() : isTouch);
 }
 window.addEventListener('orientationchange',()=>{setTimeout(()=>{if(rvNeedsVirtualPad())initControls();},350);});
 window.addEventListener('resize',()=>{
@@ -3390,6 +3388,6 @@ window.addEventListener('resize',()=>{
 });
 </script>
 <!-- RetroVault OS: START+SELECT (ou HOME) volta à shell -->
-<script src="js/rv-os-exit.js?v=8"></script>
+<script src="js/rv-os-exit.js?v=9"></script>
 </body>
 </html>

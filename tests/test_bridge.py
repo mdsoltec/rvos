@@ -68,6 +68,59 @@ class BridgeTests(unittest.TestCase):
             self.assertEqual(self.request("/api/wifi/connect", {"ssid": "rede", "psk": "segredo"})[0], 200)
             self.assertEqual(self.request("/api/wifi/connect", {"ssid": ""})[0], 400)
 
+    def test_wifi_nmcli_escaping_and_safe_connect(self):
+        self.assertEqual(bridge.nmcli_fields(r"*:Rede\:Retro:85:WPA2"), ["*", "Rede:Retro", "85", "WPA2"])
+        self.assertEqual(bridge.nmcli_fields(r"*:A\\B:60:--"), ["*", r"A\B", "60", "--"])
+        with patch.object(bridge, "wifi_adapters", return_value=["wlan0"]), \
+             patch.object(bridge, "get_wifi_status", return_value={"enabled": True} ), \
+             patch.object(bridge, "run_argv", side_effect=[(0, "", ""), (0, r"*:Rede\:Retro:85:WPA2" + "\n:Cafe:40:--", "")]):
+            # nmcli retorna linhas separadas; : em SSID não divide colunas.
+            nets = bridge.wifi_scan()
+            self.assertEqual(nets[0]["ssid"], "Rede:Retro")
+        with patch.object(bridge, "run_argv", return_value=(0, "", "")) as cmd, \
+             patch.object(bridge, "get_wifi_status", return_value={"ssid": "Rede:Retro"}):
+            ok, detail = bridge.wifi_connect("Rede:Retro", "p' ; secret")
+            self.assertTrue(ok)
+            self.assertEqual(cmd.call_args.args[0][-3:], ["Rede:Retro", "password", "p' ; secret"])
+            self.assertNotIn("secret", detail)
+
+    def test_bluetooth_api_local_only_and_validation(self):
+        sample = {"available": True, "powered": True, "devices": [{"address": "02:11:22:33:44:55", "name": "Controle", "paired": False, "connected": False}]}
+        with patch.object(bridge, "bluetooth_status", return_value=sample), \
+             patch.object(bridge, "bluetooth_scan", return_value=sample), \
+             patch.object(bridge, "bluetooth_action", return_value=(True, "Concluído")) as action:
+            self.assertEqual(json.loads(self.request("/api/bluetooth/status")[1])["devices"][0]["name"], "Controle")
+            self.assertEqual(self.request("/api/bluetooth/scan")[0], 200)
+            self.assertEqual(self.request("/api/bluetooth/action", {"address":"02:11:22:33:44:55", "action":"pair"})[0], 200)
+            self.assertEqual(action.call_count, 1)
+            self.assertEqual(self.request("/api/bluetooth/action", {"address":";reboot", "action":"pair"})[0], 400)
+            self.assertEqual(self.request("/api/bluetooth/action", {"address":"02:11:22:33:44:55", "action":"poweroff"})[0], 400)
+            self.assertEqual(self.request("/api/bluetooth/action", {"address":"02:11:22:33:44:55", "action":"pair"}, origin="http://evil.example")[0], 403)
+            self.assertEqual(action.call_count, 1)
+
+    def test_bluetooth_actions_check_known_device(self):
+        with patch.object(bridge, "bluetooth_status", return_value={"available": True, "powered": True, "devices": []}), \
+             patch.object(bridge, "bt_exec") as cmd:
+            ok, _ = bridge.bluetooth_action("02:11:22:33:44:55", "pair")
+            self.assertFalse(ok)
+            cmd.assert_not_called()
+
+    def test_bluetooth_parses_adapter_and_verifies_disconnect(self):
+        mac = "02:11:22:33:44:55"
+        with patch.object(bridge.shutil, "which", return_value="/usr/bin/bluetoothctl"), \
+             patch.object(bridge, "bt_exec", side_effect=[
+                 (0, "Controller AA:BB:CC:DD:EE:FF RetroVault\n  Powered: yes", ""),
+                 (0, f"Device {mac} Controle", ""),
+                 (0, "  Paired: yes\n  Connected: yes", "")
+             ]):
+            self.assertEqual(bridge.bluetooth_status()["devices"][0]["name"], "Controle")
+        device = {"address": mac, "name": "Controle", "paired": True, "connected": True}
+        with patch.object(bridge, "bluetooth_status", return_value={"available": True, "powered": True, "devices": [device]}), \
+             patch.object(bridge, "bt_exec", side_effect=[(0, "", ""), (0, "Connected: yes", "")]) as cmd:
+            ok, _ = bridge.bluetooth_action(mac, "disconnect")
+            self.assertFalse(ok)
+            self.assertEqual(cmd.call_args_list[0].args, ("disconnect", mac))
+
     def test_remote_ip_cannot_modify_hardware(self):
         handler = object.__new__(bridge.Handler)
         handler.client_address = ("192.168.0.21", 1234)

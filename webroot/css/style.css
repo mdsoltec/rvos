@@ -157,23 +157,6 @@ a { -webkit-tap-highlight-color: transparent; }
 }
 .skip-link:focus { top: 12px; }
 
-/* ═══════════════ CRT SCANLINES ═══════════════ */
-.crt-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9990;
-  pointer-events: none;
-  background-image: repeating-linear-gradient(0deg,
-      transparent, transparent 2px,
-      rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
-}
-.crt-overlay::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.28) 100%);
-}
-
 /* ═══════════════ REVEAL ON SCROLL ═══════════════ */
 .reveal {
   opacity: 0;

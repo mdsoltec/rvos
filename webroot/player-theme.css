@@ -1,0 +1,98 @@
+/* RetroVault OS — player: aparência da interface, não dos pixels do jogo. */
+body.rv-os-player { color:var(--text); font-family:var(--font-body); }
+body.rv-os-player #rv-loading {
+  --rv-color:var(--green) !important;
+  --rv-glow:color-mix(in srgb,var(--green) 18%,transparent) !important;
+  background:var(--bg); color:var(--text);
+}
+body.rv-os-player .rv-bg { background:var(--theme-pattern),
+  radial-gradient(700px 420px at 50% 38%,var(--green-soft),transparent 70%),var(--bg); }
+/* CRT jamais retorna: inclusive no carregamento, sem scanlines. */
+body.rv-os-player .rv-bg::after { content:none !important; animation:none !important; }
+body.rv-os-player .rv-bg::before { opacity:.6; }
+body.rv-os-player .rv-logo { background:var(--panel-2); border-radius:var(--theme-radius);
+  text-shadow:none; animation:none; box-shadow:0 0 18px var(--green-soft); }
+body.rv-os-player .rv-console-title,body.rv-os-player .rv-name { color:var(--text);text-shadow:none; }
+body.rv-os-player .rv-game-sub,body.rv-os-player .rv-dl-info { color:var(--text-muted); }
+body.rv-os-player #rv-download-progress { background:var(--panel);border-color:var(--line); }
+body.rv-os-player .rv-dl-bar-wrap { background:var(--green-soft); }
+body.rv-os-player .rv-dl-bar-fill { background:var(--green);box-shadow:none; }
+body.rv-os-player .rv-qm-toggle,
+body.rv-os-player #rv-fs-btn,
+body.rv-os-player .rv-float-btns { background:var(--theme-bar);border-color:var(--line);
+  border-radius:var(--theme-radius); }
+body.rv-os-player .rv-qm-toggle svg,
+body.rv-os-player #rv-fs-btn svg,
+body.rv-os-player .rv-float-btn svg { fill:var(--green); }
+body.rv-os-player .rv-qm-toggle .rv-icon,
+body.rv-os-player #rv-fs-btn .rv-icon,
+body.rv-os-player .rv-float-btn .rv-icon { stroke:var(--green); }
+body.rv-os-player .rv-qm-toggle:hover,
+body.rv-os-player .rv-float-btn:hover { background:var(--green-soft);border-color:var(--green); }
+body.rv-os-player .rv-toast { background:var(--panel);border-color:var(--green);
+  color:var(--green);box-shadow:0 10px 30px rgba(0,0,0,.25); }
+body.rv-os-player .rv-toast .rv-inline-icon { stroke:var(--green); }
+body.rv-os-player #rv-sys-bar,
+body.rv-os-player #rv-resume,
+body.rv-os-player #rv-gate .rv-gate-box {
+  color:var(--text);background:var(--theme-player-bg);border:1px solid var(--line);
+  border-radius:var(--theme-radius);box-shadow:0 12px 34px rgba(0,0,0,.28);
+}
+body.rv-os-player #rv-sys-bar .rv-sys-game { color:var(--text); }
+body.rv-os-player #rv-sys-bar .rv-sys-core,
+body.rv-os-player #rv-sys-bar button.on { color:var(--green);border-color:var(--green-mid);background:var(--green-soft);box-shadow:none; }
+body.rv-os-player #rv-sys-bar .rv-sys-save-row,
+body.rv-os-player #rv-sys-bar .rv-sys-sram-row,
+body.rv-os-player #rv-sys-bar .rv-sys-actions button:not(.rv-del) {
+  background:var(--green-soft);border-color:var(--green-mid);border-radius:calc(var(--theme-radius) - 2px);
+}
+body.rv-os-player #rv-sys-bar .rv-sys-actions button:not(.rv-del) { color:var(--text); }
+body.rv-os-player #rv-sys-bar .rv-sys-actions button:not(.rv-del):focus-visible,
+body.rv-os-player #rv-sys-bar .rv-sys-actions button:not(.rv-del):hover { border-color:var(--green); }
+body.rv-os-player #rv-sys-bar .rv-sys-save-row svg,
+body.rv-os-player #rv-sys-bar .rv-sys-sram-row .rv-sram-ico { stroke:var(--green); }
+body.rv-os-player #rv-sys-bar .rv-sys-save-info,
+body.rv-os-player #rv-sys-bar .rv-sys-sram-row .rv-sram-label,
+body.rv-os-player #rv-resume .rv-resume-txt,
+body.rv-os-player #rv-gate p { color:var(--text-dim); }
+body.rv-os-player #rv-sys-bar .rv-sys-sram-row button,
+body.rv-os-player #rv-resume button,
+body.rv-os-player #rv-gate .rv-gate-pad button { color:var(--text);border-color:var(--green-mid);background:var(--green-soft); }
+body.rv-os-player #rv-resume .rv-resume-txt small { color:var(--text-muted); }
+body.rv-os-player #rv-resume button.rv-resume-go { color:var(--theme-ink);background:var(--green); }
+body.rv-os-player #rv-resume .rv-resume-go svg { fill:var(--theme-ink); }
+body.rv-os-player #rv-gate { background:var(--theme-overlay); }
+body.rv-os-player #rv-gate h3,body.rv-os-player #rv-gate .rv-gate-dots { color:var(--green); }
+body.rv-os-player.rv-bezel-auto #game { outline-color:var(--green); }
+
+/* Elementos injetados pelo EmulatorJS no menu. Especificidade > CSS legada. */
+body.rv-os-player .ejs_parent {
+  --rv-menu-bg:var(--theme-bar);--rv-menu-border:var(--line);--rv-menu-hover:var(--green-soft);
+  color:var(--text);
+}
+body.rv-os-player .ejs_parent .ejs_popup_container { background:var(--theme-overlay) !important; }
+body.rv-os-player .ejs_parent .ejs_menu_bar,
+body.rv-os-player .ejs_parent .ejs_context_menu,
+body.rv-os-player .ejs_parent .ejs_settings_main_bar,
+body.rv-os-player .ejs_parent .ejs_settings_center_left,
+body.rv-os-player .ejs_parent .ejs_settings_center_right {
+  color:var(--text) !important;background:var(--theme-bar) !important;
+  border:1px solid var(--line) !important;border-radius:var(--theme-radius) !important;
+  box-shadow:0 10px 28px rgba(0,0,0,.22) !important;
+}
+body.rv-os-player .ejs_parent .ejs_menu_button svg { fill:var(--green) !important; }
+body.rv-os-player .ejs_parent .ejs_menu_text,
+body.rv-os-player .ejs_parent .ejs_menu_text_right,
+body.rv-os-player .ejs_parent .ejs_option_row { color:var(--text) !important; }
+body.rv-os-player .ejs_parent .ejs_option_row_selected,
+body.rv-os-player .ejs_parent .ejs_control_selected { background:var(--green-soft) !important;box-shadow:inset 3px 0 0 var(--green) !important; }
+body.rv-os-player .ejs_parent ::-webkit-scrollbar-thumb { background:var(--green-mid); }
+body.rv-os-player .ejs_parent .ejs_start_button { background:var(--theme-bar) !important;
+  color:var(--text) !important;border-color:var(--green-mid) !important;text-shadow:none !important; }
+body.rv-os-player .ejs_parent .ejs_start_button:hover { box-shadow:0 0 12px var(--green-mid) !important; }
+:root[data-rv-theme="polar"] body.rv-os-player .rv-bg::before { opacity:.3; }
+:root[data-rv-theme="polar"] body.rv-os-player .rv-logo { color:var(--green); }
+@media (prefers-reduced-motion:reduce) {
+  body.rv-os-player .rv-load-ring::before,body.rv-os-player .rv-load-ring::after,
+  body.rv-os-player .rv-bar { animation:none !important; }
+}

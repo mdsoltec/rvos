@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════
    RetroVault OS — ponte com o hardware ("bridge")
    No console, um daemon local (firmware/rootfs/opt/retrovault/bridge.py)
-   serve o próprio site e responde /api/*: wi-fi, volume, brilho,
-   bateria e energia. Fora do console (navegador comum), cai no modo
+   serve o próprio site e responde /api/*: wi-fi, Bluetooth,
+   volume, brilho, bateria e energia. Fora do console (navegador comum), cai no modo
    SIMULAÇÃO para a shell funcionar em qualquer lugar.
    ═══════════════════════════════════════════════════════════════════ */
 (function () {
@@ -16,9 +16,13 @@
       const ctl = new AbortController();
       const t = setTimeout(() => { ctl.abort(); reject(new Error('timeout')); }, timeout);
       fetch(path, Object.assign({ signal: ctl.signal }, opts || {}))
-        .then(r => { clearTimeout(t); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
-        .then(r => { if (r.ok === false) throw new Error(r.error || r.detail || 'Falha na API'); return r; })
-        .then(resolve, (e) => { clearTimeout(t); reject(e); });
+        .then(async response => {
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || payload.ok === false) throw new Error(payload.error || payload.detail || 'http ' + response.status);
+          return payload;
+        })
+        .then(resolve, reject)
+        .finally(() => clearTimeout(t));
     });
   }
   function post(path, body, timeout) {
@@ -34,6 +38,10 @@
       { ssid: 'Rede Simulada', signal: 82, secure: true, connected: true },
       { ssid: 'VIZINHO_5G', signal: 46, secure: true },
       { ssid: 'Cafe Retro', signal: 31, secure: false },
+    ],
+    bluetooth: [
+      { address: '02:11:22:33:44:55', name: 'Controle de exemplo', paired: false, connected: false },
+      { address: '02:11:22:33:44:66', name: 'Fone de exemplo', paired: true, connected: false },
     ],
   };
 
@@ -67,21 +75,41 @@
       v = Math.max(10, Math.min(100, v | 0));
       if (available) return post('/api/brightness', { value: v });
       sim.brightness = v; localStorage.setItem('rvos:brightness', String(v));
-      document.querySelector('.crt-vignette').style.opacity = String(1.4 - v / 100 * 0.9);
       return { ok: true, value: v };
     },
 
     async wifiScan() {
-      if (available) return req('/api/wifi/scan', null, 18000);
+      if (available) return req('/api/wifi/scan', null, 45000);
       return { ok: true, networks: sim.nets };
     },
 
     async wifiConnect(ssid, psk) {
-      if (available) return post('/api/wifi/connect', { ssid: ssid, psk: psk || '' }, 45000);
+      if (available) return post('/api/wifi/connect', { ssid: ssid, psk: psk || '' }, 60000);
       await new Promise(r => setTimeout(r, 1200)); // finge handshake
       sim.wifi = { connected: true, ssid: ssid, signal: 75 };
       sim.nets.forEach(n => n.connected = n.ssid === ssid);
       return { ok: true };
+    },
+
+    async bluetoothStatus() {
+      if (available) return req('/api/bluetooth/status', null, 20000);
+      return { ok: true, simulated: true, available: true, powered: true, devices: sim.bluetooth.map(d => ({ ...d })) };
+    },
+    async bluetoothScan() {
+      if (available) return req('/api/bluetooth/scan', null, 30000);
+      return Bridge.bluetoothStatus();
+    },
+    async bluetoothAction(address, action) {
+      if (available) return post('/api/bluetooth/action', { address, action }, 70000);
+      await new Promise(r => setTimeout(r, 400));
+      const device = sim.bluetooth.find(d => d.address === address);
+      if (!device) throw new Error('Dispositivo não encontrado');
+      if (action === 'pair') { device.paired = true; device.connected = true; }
+      else if (action === 'connect') device.connected = true;
+      else if (action === 'disconnect') device.connected = false;
+      else if (action === 'remove') { device.paired = false; device.connected = false; }
+      else throw new Error('Ação inválida');
+      return { ok: true, simulated: true };
     },
 
     async power(action) { // 'shutdown' | 'reboot'

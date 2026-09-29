@@ -4,24 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>RetroVault OS</title>
+<script src="theme.js?v=1"></script>
 <link rel="stylesheet" href="fonts.css?v=5">
 <link rel="stylesheet" href="icons.css?v=8">
-<link rel="stylesheet" href="shell.css?v=10">
+<link rel="stylesheet" href="shell.css?v=18">
+<link rel="stylesheet" href="theme.css?v=1">
 <link rel="icon" href="assets/rv-icon.png">
 </head>
 <body>
 
-<!-- ══════════════ TELA DE BOOT ══════════════ -->
-<div id="boot">
-  <div class="boot-inner">
-    <img class="boot-logo" src="assets/rv-transparent-final-solid.png" alt="RetroVault" draggable="false">
-    <div class="boot-title">RETROVAULT <span>OS</span></div>
-    <div class="boot-bar"><div class="boot-bar-fill" id="bootFill"></div></div>
-    <div class="boot-msg" id="bootMsg">Iniciando…</div>
-  </div>
-  <div class="boot-footer">RetroVault OS · firmware unificado</div>
-</div>
-
+<!-- O boot visual pertence ao firmware; a interface abre direto na shell
+     ou no assistente de primeiro uso. -->
 <!-- ══════════════ APLICAÇÃO ══════════════ -->
 <div id="app" hidden>
 
@@ -53,6 +46,8 @@
     <span class="hint" data-h="a"><i class="pad a">A</i><em>Confirmar</em></span>
     <span class="hint" data-h="b"><i class="pad b">B</i><em>Voltar</em></span>
     <span class="hint" data-h="x"><i class="pad x">X</i><em>Favorito</em></span>
+    <span class="hint" data-h="y" hidden><i class="pad y">Y</i><em>Ficha</em></span>
+    <span class="hint" data-h="select" hidden><i class="pad st">SEL</i><em>Status</em></span>
     <span class="hint" data-h="start"><i class="pad st"><span data-rv-icon="menu"></span></i><em>Energia</em></span>
   </footer>
 
@@ -61,15 +56,13 @@
 
 </div>
 
-<!-- Efeitos CRT -->
-<div class="crt-scanlines" aria-hidden="true"></div>
-<div class="crt-vignette" aria-hidden="true"></div>
-
 <script src="js/catalog.js?v=6"></script>
-<script src="icons.js?v=8"></script>
-<script src="bridge.js?v=6"></script>
+<script src="js/fichas.js?v=1"></script>
+<script src="icons.js?v=10"></script>
+<script src="bridge.js?v=7"></script>
 <script src="input.js?v=6"></script>
-<script src="shell.js?v=9"></script>
+<script src="profile-data.js?v=2"></script>
+<script src="shell.js?v=16"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
 </body>
 </html>

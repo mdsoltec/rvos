@@ -70,7 +70,8 @@ set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-  chromium cage curl network-manager wpasupplicant alsa-utils ca-certificates
+  chromium cage curl network-manager wpasupplicant bluez alsa-utils ca-certificates
+systemctl enable bluetooth
 systemctl enable NetworkManager
 # usuário da shell (sem senha de login — device de appliance)
 id rv 2>/dev/null || useradd -m -s /bin/bash rv
@@ -84,7 +85,7 @@ rm -rf /var/lib/apt/lists/*
 EOF
 chmod +x "$WORK/mnt/root/tmp/customize.sh"
 
-if [ ! -s "$REPO/webroot/js/catalog.js" ] || [ ! -d "$REPO/webroot/assets" ] || [ ! -d "$REPO/webroot/covers" ] || [ ! -d "$REPO/webroot/cheats" ]; then
+if [ ! -s "$REPO/webroot/js/catalog.js" ] || [ ! -s "$REPO/webroot/js/fichas.js" ] || [ ! -d "$REPO/webroot/assets" ] || [ ! -d "$REPO/webroot/covers" ] || [ ! -d "$REPO/webroot/cheats" ]; then
   echo ">> dados ausentes: sincronizando com RetroVault WEB…"
   bash "$REPO/tools/sync-from-web.sh"
 else

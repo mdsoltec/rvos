@@ -16,20 +16,20 @@
   ];
   const styles = document.createElement('style');
   styles.textContent = `
-    #rv-os-menu { position:fixed;inset:0;z-index:10001;background:rgba(0,8,4,.92);
-      display:flex;align-items:center;justify-content:center;padding:12px;font-family:Rajdhani,system-ui,sans-serif;color:#fff }
-    #rv-os-menu .panel {width:min(460px,96vw);max-height:96vh;overflow:auto;background:#07110a;border:1px solid #24753a;
-      padding:16px;border-radius:16px;box-shadow:0 18px 55px #000}
-    #rv-os-menu h2 {font:700 clamp(17px,3vw,24px) Orbitron,system-ui;color:#00ff41;margin:0 0 9px}
-    #rv-os-menu p {font-size:15px;color:#c9d6cd;margin:0 0 10px}
+    #rv-os-menu { position:fixed;inset:0;z-index:10001;background:var(--theme-overlay,rgba(0,8,4,.92));
+      display:flex;align-items:center;justify-content:center;padding:12px;font-family:var(--font-body,Rajdhani),system-ui,sans-serif;color:var(--text,#fff) }
+    #rv-os-menu .panel {width:min(460px,96vw);max-height:96vh;overflow:auto;background:var(--panel,#07110a);border:1px solid var(--line,#24753a);
+      padding:16px;border-radius:var(--theme-radius,16px);box-shadow:0 18px 55px rgba(0,0,0,.3)}
+    #rv-os-menu h2 {font:700 clamp(17px,3vw,24px) var(--font-display,Orbitron),system-ui;color:var(--green,#00ff41);margin:0 0 9px}
+    #rv-os-menu p {font-size:15px;color:var(--text-dim,#c9d6cd);margin:0 0 10px}
     #rv-os-menu button {display:flex;align-items:center;gap:12px;width:100%;text-align:left;min-height:42px;padding:8px 12px;margin:5px 0;
-      border:1px solid #304a38;border-radius:9px;background:#0c1910;color:white;font:700 17px Rajdhani,system-ui}
-    #rv-os-menu button .rv-icon {width:22px;height:22px;color:#00ff41}
-    #rv-os-menu button[data-action=exit] .rv-icon {color:#ff7474}
+      border:1px solid var(--line,#304a38);border-radius:calc(var(--theme-radius,14px) - 4px);background:var(--panel-2,#0c1910);color:var(--text,white);font:700 17px var(--font-body,Rajdhani),system-ui}
+    #rv-os-menu button .rv-icon {width:22px;height:22px;color:var(--green,#00ff41)}
+    #rv-os-menu button[data-action=exit] .rv-icon {color:var(--bad,#ff7474)}
     #rv-os-menu h2 .rv-icon {width:25px;height:25px;vertical-align:-5px;margin-right:6px}
-    #rv-os-menu button.selected,#rv-os-menu button:focus-visible {border-color:#00ff41;outline:2px solid #00ff41;background:#164926}
-    #rv-os-menu .message {min-height:22px;color:#ffd58a;font-size:14px}
-    #rv-os-menu .hint {font-size:13px;color:#9dae9c;margin-top:9px}
+    #rv-os-menu button.selected,#rv-os-menu button:focus-visible {border-color:var(--green,#00ff41);outline:2px solid var(--green,#00ff41);background:var(--green-soft,#164926)}
+    #rv-os-menu .message {min-height:22px;color:var(--amber,#ffd58a);font-size:14px}
+    #rv-os-menu .hint {font-size:13px;color:var(--text-muted,#9dae9c);margin-top:9px}
     @media (max-height:380px) {
       #rv-os-menu .panel {padding:9px 13px}
       #rv-os-menu h2 {font-size:17px;margin-bottom:2px}
@@ -81,7 +81,7 @@
     leaving = true;
     if (menu) { menu.remove(); menu = null; }
     const veil = document.createElement('div');
-    veil.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#020503;display:flex;align-items:center;justify-content:center;color:#00ff41;font:700 16px Rajdhani,system-ui';
+    veil.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--bg,#020503);display:flex;align-items:center;justify-content:center;color:var(--green,#00ff41);font:700 16px Rajdhani,system-ui';
     veil.textContent = 'Salvando progresso e voltando à biblioteca…';
     document.body.appendChild(veil);
     try {
