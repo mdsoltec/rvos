@@ -267,15 +267,3 @@ Detalhes de montagem física
 performance real dos núcleos e gravação da imagem do Raspberry Pi exigem teste
 no hardware. Indicador “só via rede” é uma possibilidade, não garantia de que
 a ROM remota exista. Distribua sem ROMs comerciais não autorizadas.
-
-## Identidade visual dos ícones
-
-A shell e o player usam **`webroot/icons.js`** e **`webroot/icons.css`**: uma
-família de SVGs com grade 24×24, traço 1,8, cantos arredondados e `currentColor`.
-Em JavaScript use `RVIcons.render('system')`; em HTML estático use
-`<span data-rv-icon="system"></span>`. A biblioteca não precisa de CDN. O card
-**Sistema** usa a arte PNG 3D em `webroot/ui/system-gear.png`, no mesmo layout
-dos consoles. A arte é adaptada da [imagem indicada pelo usuário](https://www.pngwing.com/en/free-png-aqhfi);
-confirme os direitos de uso antes de distribuir comercialmente.
-Evite inserir emoji ou símbolos tipográficos como ícones nas novas telas;
-letras A/B/X/Y do controle e legendas são texto, não ícones decorativos.
